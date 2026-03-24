@@ -1,7 +1,6 @@
 ///|
-async fn Prompt::run_search_mode_handler(
+fn Prompt::run_search_mode_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
@@ -16,17 +15,17 @@ async fn Prompt::run_search_mode_handler(
         search_state.set_history_index(res.0)
         self.set_line_buffers(state.left, state.right, res.1)
       }
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       return Handled
     }
     if key_bindings.dismiss_completion.matches(info) {
       self.search_state = None
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       return Handled
     }
     if key_bindings.submit_prompt.matches(info) {
       self.search_state = None
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       return Handled
     }
     if key_bindings.backward_delete_character.matches(info) {
@@ -41,7 +40,7 @@ async fn Prompt::run_search_mode_handler(
           self.set_line_buffers(state.left, state.right, res.1)
         }
       }
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       return Handled
     }
     let ch = info.key_char
@@ -51,7 +50,7 @@ async fn Prompt::run_search_mode_handler(
         search_state.set_history_index(res.0)
         self.set_line_buffers(state.left, state.right, res.1)
       }
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       return Handled
     }
     self.search_state = None
@@ -60,9 +59,8 @@ async fn Prompt::run_search_mode_handler(
 }
 
 ///|
-async fn Prompt::run_search_trigger_handler(
+fn Prompt::run_search_trigger_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
@@ -71,7 +69,7 @@ async fn Prompt::run_search_trigger_handler(
     self.completion_state = None
     self.overload_state = None
     self.search_state = Some(SearchState::new())
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     return Handled
   }
   NotHandled
@@ -80,7 +78,6 @@ async fn Prompt::run_search_trigger_handler(
 ///|
 async fn Prompt::run_completion_and_history_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
@@ -96,7 +93,7 @@ async fn Prompt::run_completion_and_history_handler(
       self.completion_state = Some(
         CompletionState::new(items, String::from_array(prefix_chars.rev())),
       )
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     return Handled
   }
@@ -109,7 +106,7 @@ async fn Prompt::run_completion_and_history_handler(
       is Some(entry) {
       self.set_line_buffers(state.left, state.right, entry)
       self.track_undo(state.left, state.right)
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     return Handled
   }
@@ -119,7 +116,7 @@ async fn Prompt::run_completion_and_history_handler(
     if self.history.navigate_next() is Some(entry) {
       self.set_line_buffers(state.left, state.right, entry)
       self.track_undo(state.left, state.right)
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     return Handled
   }

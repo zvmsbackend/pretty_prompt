@@ -125,9 +125,9 @@ async fn Prompt::process_key_press(
     self.delete_selection(state.left, state.right)
     state.left.push_iter(pasted.iter())
     self.track_undo(state.left, state.right)
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
-    return Handled
+    return self.commit_requested_render(prompt, state)
   }
 
   self.run_key_handler_pipeline(
@@ -135,7 +135,7 @@ async fn Prompt::process_key_press(
     state,
     key_bindings,
     info,
-    default_handler_stages(),
+    default_key_handler_pipeline(),
   )
 }
 
@@ -148,91 +148,83 @@ fn Prompt::cancel_prompt(
 }
 
 ///|
-async fn Prompt::handle_search_mode(
+fn Prompt::handle_search_mode(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_search_mode_handler(prompt, state, key_bindings, info)
+  self.run_search_mode_handler(state, key_bindings, info)
 }
 
 ///|
-async fn Prompt::handle_navigation_modes(
+fn Prompt::handle_navigation_modes(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_navigation_modes_handler(prompt, state, key_bindings, info)
+  self.run_navigation_modes_handler(state, key_bindings, info)
 }
 
 ///|
-async fn Prompt::handle_search_trigger(
+fn Prompt::handle_search_trigger(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_search_trigger_handler(prompt, state, key_bindings, info)
+  self.run_search_trigger_handler(state, key_bindings, info)
 }
 
 ///|
-async fn Prompt::handle_selection_clipboard(
+fn Prompt::handle_selection_clipboard(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_selection_clipboard_handler(prompt, state, key_bindings, info)
+  self.run_selection_clipboard_handler(state, key_bindings, info)
 }
 
 ///|
-async fn Prompt::handle_kill_ring(
+fn Prompt::handle_kill_ring(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_kill_ring_handler(prompt, state, key_bindings, info)
+  self.run_kill_ring_handler(state, key_bindings, info)
 }
 
 ///|
-async fn Prompt::handle_selection_movement_keys(
+fn Prompt::handle_selection_movement_keys(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_selection_movement_handler(prompt, state, key_bindings, info)
+  self.run_selection_movement_handler(state, key_bindings, info)
 }
 
 ///|
-async fn Prompt::handle_undo_redo(
+fn Prompt::handle_undo_redo(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_undo_redo_handler(prompt, state, key_bindings, info)
+  self.run_undo_redo_handler(state, key_bindings, info)
 }
 
 ///|
 async fn Prompt::handle_completion_and_history(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_completion_and_history_handler(prompt, state, key_bindings, info)
+  self.run_completion_and_history_handler(state, key_bindings, info)
 }
 
 ///|
@@ -246,24 +238,22 @@ async fn Prompt::handle_submit_or_cancel(
 }
 
 ///|
-async fn Prompt::handle_edit_keys(
+fn Prompt::handle_edit_keys(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_edit_keys_handler(prompt, state, key_bindings, info)
+  self.run_edit_keys_handler(state, key_bindings, info)
 }
 
 ///|
 async fn Prompt::handle_character_input(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  self.run_character_input_handler(prompt, state, info)
+  self.run_character_input_handler(state, info)
 }
 
 ///|

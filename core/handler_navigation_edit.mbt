@@ -1,7 +1,6 @@
 ///|
-async fn Prompt::run_navigation_modes_handler(
+fn Prompt::run_navigation_modes_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
@@ -10,7 +9,7 @@ async fn Prompt::run_navigation_modes_handler(
     if key_bindings.dismiss_completion.matches(info) {
       self.completion_state = None
       self.overload_state = None
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       state.last_was_yank = false
       return Handled
     }
@@ -27,7 +26,7 @@ async fn Prompt::run_navigation_modes_handler(
             )
           }
       }
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       state.last_was_yank = false
       return Handled
     }
@@ -44,7 +43,7 @@ async fn Prompt::run_navigation_modes_handler(
             )
           }
       }
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       state.last_was_yank = false
       return Handled
     }
@@ -65,7 +64,7 @@ async fn Prompt::run_navigation_modes_handler(
           self.track_undo(state.left, state.right)
         }
         self.completion_state = None
-        self.render_line(prompt, state.left, state.right)
+        state.request_render()
         state.last_was_yank = false
         return Handled
       }
@@ -75,22 +74,21 @@ async fn Prompt::run_navigation_modes_handler(
 }
 
 ///|
-async fn Prompt::run_selection_movement_handler(
+fn Prompt::run_selection_movement_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
   if key_bindings.move_left_selection.matches(info) {
     self.handle_selection_movement(state.left, state.right, -1)
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
   if key_bindings.move_right_selection.matches(info) {
     self.handle_selection_movement(state.left, state.right, 1)
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -100,7 +98,7 @@ async fn Prompt::run_selection_movement_handler(
       state.right,
       -state.left.length(),
     )
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -110,7 +108,7 @@ async fn Prompt::run_selection_movement_handler(
       state.right,
       state.right.length(),
     )
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -118,9 +116,8 @@ async fn Prompt::run_selection_movement_handler(
 }
 
 ///|
-async fn Prompt::run_undo_redo_handler(
+fn Prompt::run_undo_redo_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
@@ -131,7 +128,7 @@ async fn Prompt::run_undo_redo_handler(
     self.selection = None
     if self.undo_manager.undo() is Some(record) {
       self.apply_undo_record(state.left, state.right, record)
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     state.last_was_yank = false
     return Handled
@@ -142,7 +139,7 @@ async fn Prompt::run_undo_redo_handler(
     self.selection = None
     if self.undo_manager.redo() is Some(record) {
       self.apply_undo_record(state.left, state.right, record)
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     state.last_was_yank = false
     return Handled
@@ -151,9 +148,8 @@ async fn Prompt::run_undo_redo_handler(
 }
 
 ///|
-async fn Prompt::run_edit_keys_handler(
+fn Prompt::run_edit_keys_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
@@ -167,7 +163,7 @@ async fn Prompt::run_edit_keys_handler(
       }
     }
     self.track_undo(state.left, state.right)
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -178,7 +174,7 @@ async fn Prompt::run_edit_keys_handler(
       ignore(state.right.pop())
     }
     self.track_undo(state.left, state.right)
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -187,7 +183,7 @@ async fn Prompt::run_edit_keys_handler(
     if state.left.pop() is Some(ch) {
       state.right.push(ch)
     }
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -196,7 +192,7 @@ async fn Prompt::run_edit_keys_handler(
     if state.right.pop() is Some(ch) {
       state.left.push(ch)
     }
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -205,7 +201,7 @@ async fn Prompt::run_edit_keys_handler(
     while state.left.pop() is Some(ch) {
       state.right.push(ch)
     }
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -214,7 +210,7 @@ async fn Prompt::run_edit_keys_handler(
     while state.right.pop() is Some(ch) {
       state.left.push(ch)
     }
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }
@@ -224,7 +220,6 @@ async fn Prompt::run_edit_keys_handler(
 ///|
 async fn Prompt::run_character_input_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
@@ -251,7 +246,7 @@ async fn Prompt::run_character_input_handler(
       }
     }
     self.track_undo(state.left, state.right)
-    self.render_line(prompt, state.left, state.right)
+    state.request_render()
     state.last_was_yank = false
     return Handled
   }

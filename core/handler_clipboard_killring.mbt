@@ -1,7 +1,6 @@
 ///|
-async fn Prompt::run_selection_clipboard_handler(
+fn Prompt::run_selection_clipboard_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
@@ -25,7 +24,7 @@ async fn Prompt::run_selection_clipboard_handler(
       self.kill_ring.add(selected_text)
       self.delete_selection(state.left, state.right)
       self.track_undo(state.left, state.right)
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     state.last_was_yank = false
     return Handled
@@ -34,9 +33,8 @@ async fn Prompt::run_selection_clipboard_handler(
 }
 
 ///|
-async fn Prompt::run_kill_ring_handler(
+fn Prompt::run_kill_ring_handler(
   self : Prompt,
-  prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
@@ -47,7 +45,7 @@ async fn Prompt::run_kill_ring_handler(
       self.kill_ring.add(text)
       state.right.clear()
       self.track_undo(state.left, state.right)
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     state.last_was_yank = false
     return Handled
@@ -58,7 +56,7 @@ async fn Prompt::run_kill_ring_handler(
       self.kill_ring.add(text)
       state.left.clear()
       self.track_undo(state.left, state.right)
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     state.last_was_yank = false
     return Handled
@@ -68,7 +66,7 @@ async fn Prompt::run_kill_ring_handler(
       self.delete_selection(state.left, state.right)
       state.left.push_iter(text.iter())
       self.track_undo(state.left, state.right)
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
       state.last_was_yank = true
     }
     return Handled
@@ -80,7 +78,7 @@ async fn Prompt::run_kill_ring_handler(
         state.left.push_iter(text.iter())
         self.track_undo(state.left, state.right)
       }
-      self.render_line(prompt, state.left, state.right)
+      state.request_render()
     }
     return Handled
   }
