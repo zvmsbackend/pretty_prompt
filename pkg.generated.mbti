@@ -7,6 +7,7 @@ import {
 }
 
 // Values
+pub fn read_key_presses(&ConsolePort) -> Array[KeyPress]
 
 // Errors
 pub suberror ClipboardPortError {
@@ -36,11 +37,36 @@ pub(all) enum ControlCMode {
 pub impl Eq for ControlCMode
 pub impl Show for ControlCMode
 
+pub struct KeyPress {
+  console_key_info : @console.ConsoleKeyInfo
+  pasted_text : String?
+}
+pub fn KeyPress::from_console_key_info(@console.ConsoleKeyInfo) -> Self
+pub fn KeyPress::from_pasted_text(String) -> Self
+
 pub struct Ports {
   console : &ConsolePort
   clipboard : &ClipboardPort
 }
 pub fn Ports::new(&ConsolePort, &ClipboardPort) -> Self
+
+pub struct Prompt {
+  console : &ConsolePort
+  clipboard : &ClipboardPort
+  cancel_controller : CancelController
+}
+pub fn Prompt::dispose(Self) -> Unit
+pub fn Prompt::new(&ConsolePort, &ClipboardPort) -> Self
+pub fn Prompt::read_line(Self, prompt? : String) -> PromptResult
+pub fn Prompt::take_execution_cancellation_requested(Self) -> Bool
+
+pub struct PromptResult {
+  is_success : Bool
+  text : String
+  submit_key_info : @console.ConsoleKeyInfo
+}
+pub fn PromptResult::cancelled(@console.ConsoleKeyInfo) -> Self
+pub fn PromptResult::submitted(String, @console.ConsoleKeyInfo) -> Self
 
 pub struct SystemClipboardPort {
 }

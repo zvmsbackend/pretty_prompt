@@ -204,3 +204,288 @@ test "cancel controller toggles mode and handles cancel" {
   controller.dispose()
   assert_eq(console.removed_handler_id.val, Some(1))
 }
+
+///|
+struct FakeInputConsole {
+  keys : Array[@console.ConsoleKeyInfo]
+  index : Ref[Int]
+  batch_all : Bool
+  output : Ref[String]
+  treat_control_c_as_input : Ref[Bool]
+  next_handler_id : Ref[Int]
+  removed_handler_id : Ref[Int?]
+  last_handler : Ref[((@console.ConsoleSpecialKey) -> Bool)?]
+}
+
+///|
+fn FakeInputConsole::new(
+  keys : Array[@console.ConsoleKeyInfo],
+) -> FakeInputConsole {
+  FakeInputConsole::new_with_batch(keys, false)
+}
+
+///|
+fn FakeInputConsole::new_with_batch(
+  keys : Array[@console.ConsoleKeyInfo],
+  batch_all : Bool,
+) -> FakeInputConsole {
+  {
+    keys,
+    index: @ref.new(0),
+    batch_all,
+    output: @ref.new(""),
+    treat_control_c_as_input: @ref.new(false),
+    next_handler_id: @ref.new(1),
+    removed_handler_id: @ref.new(None),
+    last_handler: @ref.new(None),
+  }
+}
+
+///|
+fn key(
+  key_char : Char,
+  key : @console.ConsoleKey,
+  shift? : Bool = false,
+  alt? : Bool = false,
+  control? : Bool = false,
+) -> @console.ConsoleKeyInfo {
+  @console.ConsoleKeyInfo::new(key_char, key, shift, alt, control)
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with read_key(
+  self,
+  _intercept,
+) {
+  if self.index.val >= self.keys.length() {
+    return key('\n', @console.Enter)
+  }
+  let current = self.keys[self.index.val]
+  self.index.val = self.index.val + 1
+  current
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with key_available(
+  self,
+) {
+  self.batch_all && self.index.val < self.keys.length()
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with is_error_redirected(
+  self,
+) {
+  self |> ignore
+  false
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_cursor_top(
+  self,
+) {
+  self |> ignore
+  0
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_buffer_width(
+  self,
+) {
+  self |> ignore
+  80
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_window_height(
+  self,
+) {
+  self |> ignore
+  24
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_window_top(
+  self,
+) {
+  self |> ignore
+  0
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write(self, value) {
+  self.output.val = "\{self.output.val}\{value}"
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_line(
+  self,
+  value,
+) {
+  self.output.val = "\{self.output.val}\{value}\n"
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_error(
+  self,
+  value,
+) {
+  self.output.val = "\{self.output.val}\{value}"
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_error_line(
+  self,
+  value,
+) {
+  self.output.val = "\{self.output.val}\{value}\n"
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with clear(self) {
+  self |> ignore
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with show_cursor(self) {
+  self |> ignore
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with hide_cursor(self) {
+  self |> ignore
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_treat_control_c_as_input(
+  self,
+) {
+  self.treat_control_c_as_input.val
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with set_treat_control_c_as_input(
+  self,
+  value,
+) {
+  self.treat_control_c_as_input.val = value
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with add_cancel_key_press_handler(
+  self,
+  handler,
+) {
+  self.last_handler.val = Some(handler)
+  let id = self.next_handler_id.val
+  self.next_handler_id.val = id + 1
+  id
+}
+
+///|
+pub impl @pretty_prompt.ConsolePort for FakeInputConsole with remove_cancel_key_press_handler(
+  self,
+  id,
+) {
+  self.removed_handler_id.val = Some(id)
+  self.last_handler.val = None
+}
+
+///|
+test "read_key_presses normalizes enter char" {
+  let console = FakeInputConsole::new([key('\r', @console.Enter)])
+  let key_presses = @pretty_prompt.read_key_presses(console)
+  assert_eq(key_presses.length(), 1)
+  assert_eq(key_presses[0].console_key_info.key_char, '\n')
+  assert_eq(key_presses[0].console_key_info.key, @console.Enter)
+  assert_eq(key_presses[0].pasted_text, None)
+}
+
+///|
+test "read_key_presses returns burst as paste" {
+  let console = FakeInputConsole::new_with_batch(
+    [
+      key('a', @console.A),
+      key('b', @console.B),
+      key('c', @console.C),
+      key('d', @console.D),
+    ],
+    true,
+  )
+  let key_presses = @pretty_prompt.read_key_presses(console)
+  assert_eq(key_presses.length(), 1)
+  assert_eq(key_presses[0].console_key_info.key, @console.Insert)
+  assert_eq(key_presses[0].console_key_info.shift, true)
+  assert_eq(key_presses[0].pasted_text, Some("abcd"))
+}
+
+///|
+test "read_key_presses keeps control burst as key presses" {
+  let console = FakeInputConsole::new_with_batch(
+    [
+      key('\u0001', @console.A, control=true),
+      key('\u0002', @console.B, control=true),
+      key('\u0003', @console.C, control=true),
+      key('\u0004', @console.D, control=true),
+    ],
+    true,
+  )
+  let key_presses = @pretty_prompt.read_key_presses(console)
+  assert_eq(key_presses.length(), 4)
+  assert_eq(key_presses[0].pasted_text, None)
+  assert_eq(key_presses[3].console_key_info.key_char, '\u0004')
+}
+
+///|
+test "prompt read_line submits typed text" {
+  let console = FakeInputConsole::new([
+    key('h', @console.H),
+    key('i', @console.I),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line(prompt="> ")
+  assert_true(result.is_success)
+  assert_eq(result.text, "hi")
+  assert_eq(result.submit_key_info.key, @console.Enter)
+  assert_eq(console.output.val, "> hi\n")
+  assert_false(console.treat_control_c_as_input.val)
+
+  prompt.dispose()
+  assert_eq(console.removed_handler_id.val, Some(1))
+}
+
+///|
+test "prompt read_line handles backspace" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('\u0008', @console.Backspace),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line(prompt="# ")
+  assert_true(result.is_success)
+  assert_eq(result.text, "a")
+
+  prompt.dispose()
+}
+
+///|
+test "prompt read_line returns cancelled on ctrl c" {
+  let console = FakeInputConsole::new([key('\u0003', @console.C, control=true)])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line(prompt="$ ")
+  assert_false(result.is_success)
+  assert_eq(result.text, "")
+  assert_eq(result.submit_key_info.key, @console.C)
+  assert_eq(result.submit_key_info.control, true)
+
+  prompt.dispose()
+}
