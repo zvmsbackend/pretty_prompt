@@ -591,3 +591,82 @@ test "prompt read_line uses custom submit key binding" {
 
   prompt.dispose()
 }
+
+///|
+test "prompt history recalls previous entry" {
+  let console = FakeInputConsole::new([
+    key('f', @console.F),
+    key('i', @console.I),
+    key('r', @console.R),
+    key('s', @console.S),
+    key('t', @console.T),
+    key('\n', @console.Enter),
+    key('\u0000', @console.UpArrow),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let first = prompt.read_line_with_prompt("> ")
+  assert_true(first.is_success)
+  assert_eq(first.text, "first")
+
+  let second = prompt.read_line_with_prompt("> ")
+  assert_true(second.is_success)
+  assert_eq(second.text, "first")
+
+  prompt.dispose()
+}
+
+///|
+test "prompt persistent history is loaded across prompt instances" {
+  let history_path = "_build/pretty_prompt_history_test.log"
+  @fs.remove_file(history_path) catch {
+    _ => ()
+  }
+
+  let history_config = @pretty_prompt.HistoryConfiguration::new(
+    persistent_history_filepath=history_path,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(
+    history=history_config,
+  )
+
+  let writer_console = FakeInputConsole::new([
+    key('s', @console.S),
+    key('a', @console.A),
+    key('v', @console.V),
+    key('e', @console.E),
+    key('d', @console.D),
+    key('\n', @console.Enter),
+  ])
+  let writer_prompt = @pretty_prompt.Prompt::new(
+    writer_console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let saved = writer_prompt.read_line()
+  assert_true(saved.is_success)
+  assert_eq(saved.text, "saved")
+  writer_prompt.dispose()
+
+  let reader_console = FakeInputConsole::new([
+    key('\u0000', @console.UpArrow),
+    key('\n', @console.Enter),
+  ])
+  let reader_prompt = @pretty_prompt.Prompt::new(
+    reader_console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let loaded = reader_prompt.read_line()
+  assert_true(loaded.is_success)
+  assert_eq(loaded.text, "saved")
+  reader_prompt.dispose()
+
+  @fs.remove_file(history_path) catch {
+    _ => ()
+  }
+}

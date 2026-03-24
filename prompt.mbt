@@ -3,6 +3,7 @@ pub struct Prompt {
   console : &ConsolePort
   clipboard : &ClipboardPort
   configuration : PromptConfiguration
+  history : HistoryLog
   cancel_controller : CancelController
 }
 
@@ -13,7 +14,8 @@ pub fn Prompt::new(
   configuration? : PromptConfiguration = PromptConfiguration::default(),
 ) -> Prompt {
   let cancel_controller = CancelController::new(console)
-  { console, clipboard, configuration, cancel_controller }
+  let history = HistoryLog::new(configuration.history)
+  { console, clipboard, configuration, history, cancel_controller }
 }
 
 ///|
@@ -41,7 +43,7 @@ pub fn Prompt::read_line_with_prompt(
     let key_presses = read_key_presses(self.console)
     for key_press in key_presses {
       if key_press.pasted_text is Some(pasted) {
-        append_text(left, pasted)
+        left.push_iter(pasted.iter())
         render_line(self.console, prompt, left, right)
         continue
       }
@@ -53,13 +55,34 @@ pub fn Prompt::read_line_with_prompt(
         return PromptResult::cancelled(info)
       }
 
+      if key_bindings.history_previous.matches(info) {
+        if self.history.navigate_previous(line_from_buffers(left, right))
+          is Some(entry) {
+          set_line_buffers(left, right, entry)
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      if key_bindings.history_next.matches(info) {
+        if self.history.navigate_next() is Some(entry) {
+          set_line_buffers(left, right, entry)
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      self.history.reset_navigation()
+
       if key_bindings.submit_prompt.matches(info) {
+        let line = line_from_buffers(left, right)
+        self.history.track_submission(line)
         self.console.write("\r")
         self.console.write(prompt)
-        self.console.write(line_from_buffers(left, right))
+        self.console.write(line)
         self.console.write_line("")
         self.cancel_controller.set_mode(AllowCancelSignal)
-        return PromptResult::submitted(line_from_buffers(left, right), info)
+        return PromptResult::submitted(line, info)
       }
 
       if key_bindings.backward_delete_character.matches(info) {
@@ -137,10 +160,14 @@ pub fn Prompt::dispose(self : Prompt) -> Unit {
 }
 
 ///|
-fn append_text(target : Array[Char], text : String) -> Unit {
-  for ch in text {
-    target.push(ch)
-  }
+fn set_line_buffers(
+  left : Array[Char],
+  right : Array[Char],
+  text : String,
+) -> Unit {
+  left.clear()
+  right.clear()
+  left.push_iter(text.iter())
 }
 
 ///|

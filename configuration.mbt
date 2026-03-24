@@ -66,6 +66,8 @@ pub fn KeyPressPatterns::matches(
 pub struct KeyBindings {
   submit_prompt : KeyPressPatterns
   cancel_prompt : KeyPressPatterns
+  history_previous : KeyPressPatterns
+  history_next : KeyPressPatterns
   backward_delete_character : KeyPressPatterns
   delete_character : KeyPressPatterns
   move_left : KeyPressPatterns
@@ -91,6 +93,16 @@ fn default_cancel_prompt_patterns() -> KeyPressPatterns {
 ///|
 fn default_backward_delete_character_patterns() -> KeyPressPatterns {
   @console.Backspace |> KeyPressPattern::new |> KeyPressPatterns::single
+}
+
+///|
+fn default_history_previous_patterns() -> KeyPressPatterns {
+  @console.UpArrow |> KeyPressPattern::new |> KeyPressPatterns::single
+}
+
+///|
+fn default_history_next_patterns() -> KeyPressPatterns {
+  @console.DownArrow |> KeyPressPattern::new |> KeyPressPatterns::single
 }
 
 ///|
@@ -122,6 +134,8 @@ fn default_move_end_patterns() -> KeyPressPatterns {
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns(),
   cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns(),
+  history_previous? : KeyPressPatterns = default_history_previous_patterns(),
+  history_next? : KeyPressPatterns = default_history_next_patterns(),
   backward_delete_character? : KeyPressPatterns = default_backward_delete_character_patterns(),
   delete_character? : KeyPressPatterns = default_delete_character_patterns(),
   move_left? : KeyPressPatterns = default_move_left_patterns(),
@@ -132,6 +146,8 @@ pub fn KeyBindings::new(
   {
     submit_prompt,
     cancel_prompt,
+    history_previous,
+    history_next,
     backward_delete_character,
     delete_character,
     move_left,
@@ -150,14 +166,16 @@ impl Default for KeyBindings with default() {
 pub struct PromptConfiguration {
   prompt : String
   key_bindings : KeyBindings
+  history : HistoryConfiguration
 }
 
 ///|
 pub fn PromptConfiguration::new(
   prompt? : String = "> ",
   key_bindings? : KeyBindings = KeyBindings::default(),
+  history? : HistoryConfiguration = HistoryConfiguration::default(),
 ) -> PromptConfiguration {
-  { prompt, key_bindings }
+  { prompt, key_bindings, history }
 }
 
 ///|

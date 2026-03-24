@@ -37,9 +37,31 @@ pub(all) enum ControlCMode {
 pub impl Eq for ControlCMode
 pub impl Show for ControlCMode
 
+pub struct HistoryConfiguration {
+  persistent_history_filepath : String?
+  max_entries : Int
+}
+pub fn HistoryConfiguration::default() -> Self
+pub fn HistoryConfiguration::new(persistent_history_filepath? : String, max_entries? : Int) -> Self
+
+pub struct HistoryLog {
+  entries : Array[String]
+  config : HistoryConfiguration
+  navigation_index : @ref.Ref[Int?]
+  unsubmitted_buffer : @ref.Ref[String]
+}
+pub fn HistoryLog::entry_count(Self) -> Int
+pub fn HistoryLog::navigate_next(Self) -> String?
+pub fn HistoryLog::navigate_previous(Self, String) -> String?
+pub fn HistoryLog::new(HistoryConfiguration) -> Self
+pub fn HistoryLog::reset_navigation(Self) -> Unit
+pub fn HistoryLog::track_submission(Self, String) -> Unit
+
 pub struct KeyBindings {
   submit_prompt : KeyPressPatterns
   cancel_prompt : KeyPressPatterns
+  history_previous : KeyPressPatterns
+  history_next : KeyPressPatterns
   backward_delete_character : KeyPressPatterns
   delete_character : KeyPressPatterns
   move_left : KeyPressPatterns
@@ -47,7 +69,7 @@ pub struct KeyBindings {
   move_home : KeyPressPatterns
   move_end : KeyPressPatterns
 }
-pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns) -> Self
+pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns) -> Self
 
 pub struct KeyPress {
   console_key_info : @console.ConsoleKeyInfo
@@ -77,6 +99,7 @@ pub struct Prompt {
   console : &ConsolePort
   clipboard : &ClipboardPort
   configuration : PromptConfiguration
+  history : HistoryLog
   cancel_controller : CancelController
 }
 pub fn Prompt::dispose(Self) -> Unit
@@ -88,9 +111,10 @@ pub fn Prompt::take_execution_cancellation_requested(Self) -> Bool
 pub struct PromptConfiguration {
   prompt : String
   key_bindings : KeyBindings
+  history : HistoryConfiguration
 }
 pub fn PromptConfiguration::default() -> Self
-pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings) -> Self
+pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration) -> Self
 
 pub struct PromptResult {
   is_success : Bool
