@@ -78,9 +78,10 @@ pub struct CompletionItem {
   replacement_text : String
   display_text : String
   filter_text : String
+  description : String
 }
 pub fn CompletionItem::get_priority(Self, String) -> Int
-pub fn CompletionItem::new(String, display_text? : String, filter_text? : String) -> Self
+pub fn CompletionItem::new(String, display_text? : String, filter_text? : String, description? : String) -> Self
 
 pub struct CompletionState {
   mut items : Array[CompletionItem]
@@ -185,6 +186,25 @@ pub fn KeyPressPatterns::matches(Self, @console.ConsoleKeyInfo) -> Bool
 pub fn KeyPressPatterns::new(Array[KeyPressPattern]) -> Self
 pub fn KeyPressPatterns::single(KeyPressPattern) -> Self
 
+pub struct OverloadItem {
+  signature : String
+  summary : String
+  parameters : Array[Parameter]
+}
+pub fn OverloadItem::new(String, summary? : String, parameters? : Array[Parameter]) -> Self
+
+pub struct OverloadState {
+  items : Array[OverloadItem]
+  mut selected_index : Int
+}
+pub fn OverloadState::new(Array[OverloadItem]) -> Self
+
+pub struct Parameter {
+  name : String
+  description : String
+}
+pub fn Parameter::new(String, String) -> Self
+
 pub struct Ports {
   console : &ConsolePort
   clipboard : &ClipboardPort
@@ -201,6 +221,7 @@ pub struct Prompt {
   mut last_screen : Screen?
   undo_manager : UndoManager
   mut selection : Selection?
+  mut overload_state : OverloadState?
 }
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
@@ -214,11 +235,12 @@ pub struct PromptConfiguration {
   history : HistoryConfiguration
   highlighter : async (String) -> Array[FormatSpan]
   completer : async (String, Int) -> Array[CompletionItem]
+  overload_provider : async (String, Int) -> Array[OverloadItem]
   selection_background : AnsiColor
   use_colors : Bool
   max_completion_items_count : Int
 }
-pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], selection_background? : AnsiColor, use_colors? : Bool, max_completion_items_count? : Int) -> Self
+pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], overload_provider? : async (String, Int) -> Array[OverloadItem], selection_background? : AnsiColor, use_colors? : Bool, max_completion_items_count? : Int) -> Self
 pub impl Default for PromptConfiguration
 
 pub struct PromptResult {

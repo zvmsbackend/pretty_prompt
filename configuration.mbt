@@ -297,6 +297,7 @@ pub struct PromptConfiguration {
   history : HistoryConfiguration
   highlighter : async (String) -> Array[FormatSpan]
   completer : async (String, Int) -> Array[CompletionItem]
+  overload_provider : async (String, Int) -> Array[OverloadItem]
   selection_background : AnsiColor
   use_colors : Bool
   max_completion_items_count : Int
@@ -309,6 +310,7 @@ pub fn PromptConfiguration::new(
   history? : HistoryConfiguration = HistoryConfiguration::default(),
   highlighter? : async (String) -> Array[FormatSpan] = _ => [],
   completer? : async (String, Int) -> Array[CompletionItem] = (_, _) => [],
+  overload_provider? : async (String, Int) -> Array[OverloadItem] = (_, _) => [],
   selection_background? : AnsiColor = Blue,
   use_colors? : Bool = true,
   max_completion_items_count? : Int = 5,
@@ -319,6 +321,7 @@ pub fn PromptConfiguration::new(
     history,
     highlighter,
     completer,
+    overload_provider,
     selection_background,
     use_colors,
     max_completion_items_count,

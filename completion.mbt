@@ -1,8 +1,10 @@
 ///|
+/// 补全项
 pub struct CompletionItem {
   replacement_text : String
   display_text : String
   filter_text : String
+  description : String // 详细文档说明
 }
 
 ///|
@@ -10,11 +12,54 @@ pub fn CompletionItem::new(
   replacement_text : String,
   display_text? : String = replacement_text,
   filter_text? : String = replacement_text,
+  description? : String = "",
 ) -> CompletionItem {
-  { replacement_text, display_text, filter_text }
+  { replacement_text, display_text, filter_text, description }
 }
 
 ///|
+/// 重载参数项
+pub struct Parameter {
+  name : String
+  description : String
+}
+
+///|
+pub fn Parameter::new(name : String, description : String) -> Parameter {
+  { name, description }
+}
+
+///|
+/// 函数重载项
+pub struct OverloadItem {
+  signature : String
+  summary : String
+  parameters : Array[Parameter]
+}
+
+///|
+pub fn OverloadItem::new(
+  signature : String,
+  summary? : String = "",
+  parameters? : Array[Parameter] = [],
+) -> OverloadItem {
+  { signature, summary, parameters }
+}
+
+///|
+/// 重载面板状态
+pub struct OverloadState {
+  items : Array[OverloadItem]
+  mut selected_index : Int
+}
+
+///|
+pub fn OverloadState::new(items : Array[OverloadItem]) -> OverloadState {
+  { items, selected_index: 0 }
+}
+
+///|
+/// (保持之前的 CompletionItem::get_priority, CompletionState::new, CompletionState::filter 不变)
 pub fn CompletionItem::get_priority(
   self : CompletionItem,
   pattern : String,

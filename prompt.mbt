@@ -9,6 +9,7 @@ pub struct Prompt {
   mut last_screen : Screen?
   undo_manager : UndoManager
   mut selection : Selection?
+  mut overload_state : OverloadState?
 }
 
 ///|
@@ -30,6 +31,7 @@ pub async fn Prompt::new(
     last_screen: None,
     undo_manager: UndoManager::new("", 0),
     selection: None,
+    overload_state: None,
   }
 }
 
@@ -59,6 +61,7 @@ pub async fn Prompt::read_line_with_prompt(
     for key_press in key_presses {
       if key_press.pasted_text is Some(pasted) {
         self.completion_state = None
+        self.overload_state = None
         self.delete_selection(left, right)
         left.push_iter(pasted.iter())
         self.track_undo(left, right)
@@ -71,54 +74,73 @@ pub async fn Prompt::read_line_with_prompt(
       // 1. Global keys
       if key_bindings.cancel_prompt.matches(info) {
         self.completion_state = None
+        self.overload_state = None
         self.selection = None
         self.console.write_line("")
         self.cancel_controller.set_mode(AllowCancelSignal)
         return PromptResult::cancelled(info)
       }
 
-      // 2. Completion Mode
-      if self.completion_state is Some(state) {
+      // 2. Handle Navigation Mode (Completion or Overload)
+      let is_nav_mode = self.completion_state is Some(_) ||
+        self.overload_state is Some(_)
+      if is_nav_mode {
         if key_bindings.dismiss_completion.matches(info) {
           self.completion_state = None
+          self.overload_state = None
           self.render_line(prompt, left, right)
           continue
         }
 
         if key_bindings.history_previous.matches(info) {
-          state.selected_index = (
-              state.selected_index + state.items.length() - 1
-            ) %
-            state.items.length()
+          if self.completion_state is Some(state) {
+            state.selected_index = (
+                state.selected_index + state.items.length() - 1
+              ) %
+              state.items.length()
+          } else if self.overload_state is Some(state) {
+            state.selected_index = (
+                state.selected_index + state.items.length() - 1
+              ) %
+              state.items.length()
+          }
           self.render_line(prompt, left, right)
           continue
         }
 
         if key_bindings.history_next.matches(info) {
-          state.selected_index = (state.selected_index + 1) %
-            state.items.length()
+          if self.completion_state is Some(state) {
+            state.selected_index = (state.selected_index + 1) %
+              state.items.length()
+          } else if self.overload_state is Some(state) {
+            state.selected_index = (state.selected_index + 1) %
+              state.items.length()
+          }
           self.render_line(prompt, left, right)
           continue
         }
 
-        if key_bindings.submit_prompt.matches(info) ||
-          key_bindings.trigger_completion.matches(info) {
-          if state.items.length() > 0 {
-            let item = state.items[state.selected_index]
-            while left.length() > 0 &&
-                  is_word_character(left[left.length() - 1]) {
-              ignore(left.pop())
+        // Completion Commitment
+        if self.completion_state is Some(state) {
+          if key_bindings.submit_prompt.matches(info) ||
+            key_bindings.trigger_completion.matches(info) {
+            if state.items.length() > 0 {
+              let item = state.items[state.selected_index]
+              while left.length() > 0 &&
+                    is_word_character(left[left.length() - 1]) {
+                ignore(left.pop())
+              }
+              while right.length() > 0 &&
+                    is_word_character(right[right.length() - 1]) {
+                ignore(right.pop())
+              }
+              left.push_iter(item.replacement_text.iter())
+              self.track_undo(left, right)
             }
-            while right.length() > 0 &&
-                  is_word_character(right[right.length() - 1]) {
-              ignore(right.pop())
-            }
-            left.push_iter(item.replacement_text.iter())
-            self.track_undo(left, right)
+            self.completion_state = None
+            self.render_line(prompt, left, right)
+            continue
           }
-          self.completion_state = None
-          self.render_line(prompt, left, right)
-          continue
         }
       }
 
@@ -171,6 +193,7 @@ pub async fn Prompt::read_line_with_prompt(
       // 5. Undo/Redo
       if key_bindings.undo.matches(info) {
         self.completion_state = None
+        self.overload_state = None
         self.selection = None
         if self.undo_manager.undo() is Some(record) {
           self.apply_undo_record(left, right, record)
@@ -181,6 +204,7 @@ pub async fn Prompt::read_line_with_prompt(
 
       if key_bindings.redo.matches(info) {
         self.completion_state = None
+        self.overload_state = None
         self.selection = None
         if self.undo_manager.redo() is Some(record) {
           self.apply_undo_record(left, right, record)
@@ -210,6 +234,7 @@ pub async fn Prompt::read_line_with_prompt(
       // 7. Standard Keys
       if key_bindings.history_previous.matches(info) {
         self.completion_state = None
+        self.overload_state = None
         self.selection = None
         if self.history.navigate_previous(line_from_buffers(left, right))
           is Some(entry) {
@@ -222,6 +247,7 @@ pub async fn Prompt::read_line_with_prompt(
 
       if key_bindings.history_next.matches(info) {
         self.completion_state = None
+        self.overload_state = None
         self.selection = None
         if self.history.navigate_next() is Some(entry) {
           set_line_buffers(left, right, entry)
@@ -235,6 +261,7 @@ pub async fn Prompt::read_line_with_prompt(
 
       if key_bindings.submit_prompt.matches(info) {
         self.completion_state = None
+        self.overload_state = None
         self.selection = None
         let line = line_from_buffers(left, right)
         self.history.track_submission(line)
@@ -306,6 +333,15 @@ pub async fn Prompt::read_line_with_prompt(
           if items.length() > 0 {
             self.completion_state = Some(CompletionState::new(items, ""))
           }
+        } else if ch == '(' {
+          let raw_line = line_from_buffers(left, right)
+          let overloads = (self.configuration.overload_provider)(
+            raw_line,
+            left.length(),
+          )
+          if overloads.length() > 0 {
+            self.overload_state = Some(OverloadState::new(overloads))
+          }
         }
         self.track_undo(left, right)
         self.render_line(prompt, left, right)
@@ -323,7 +359,6 @@ fn Prompt::handle_selection_movement(
   delta : Int,
 ) -> Unit {
   let old_pos = left.length()
-  // Move cursor
   if delta < 0 {
     for _ in 0..<-delta {
       if left.pop() is Some(ch) {
@@ -338,7 +373,6 @@ fn Prompt::handle_selection_movement(
     }
   }
   let new_pos = left.length()
-
   match self.selection {
     None => self.selection = Some(Selection::new(old_pos, new_pos))
     Some(sel) => {
@@ -356,24 +390,21 @@ fn Prompt::delete_selection(
   left : Array[Char],
   right : Array[Char],
 ) -> Unit {
-  match self.selection {
-    None => ()
-    Some(sel) => {
-      let (start, end) = sel.range()
-      let text = line_from_buffers(left, right)
-      let chars = text.to_array()
-      left.clear()
-      right.clear()
-      for i in 0..<start {
-        if i < chars.length() {
-          left.push(chars[i])
-        }
+  if self.selection is Some(sel) {
+    let (start, end) = sel.range()
+    let text = line_from_buffers(left, right)
+    let chars = text.to_array()
+    left.clear()
+    right.clear()
+    for i in 0..<start {
+      if i < chars.length() {
+        left.push(chars[i])
       }
-      for i in chars.length()>..end {
-        right.push(chars[i])
-      }
-      self.selection = None
     }
+    for i in chars.length()>..end {
+      right.push(chars[i])
+    }
+    self.selection = None
   }
 }
 
@@ -462,6 +493,8 @@ async fn Prompt::render_line(
 ) -> Unit {
   let width = self.console.get_buffer_width()
   let max_items = self.configuration.max_completion_items_count
+
+  // Calculate heights
   let completion_items_count = match self.completion_state {
     Some(state) =>
       if state.items.length() < max_items {
@@ -471,7 +504,16 @@ async fn Prompt::render_line(
       }
     None => 0
   }
-  let height = 1 + completion_items_count
+  let overload_items_count = match self.overload_state {
+    Some(state) =>
+      if state.items.length() < 3 {
+        state.items.length()
+      } else {
+        3
+      }
+    None => 0
+  }
+  let height = 1 + completion_items_count + overload_items_count
   let new_screen = Screen::new(height, width)
 
   // 1. Draw main line
@@ -483,72 +525,91 @@ async fn Prompt::render_line(
   }
   new_screen.draw_string(0, 0, prompt, ConsoleFormat::default())
   let prompt_width = get_string_width(prompt)
-
   let mut current_col = prompt_width
   let sorted_spans = spans.copy()
   sorted_spans.sort_by_key(span => span.start)
   let chars = raw_line.to_array()
-
   for i in 0..<chars.length() {
     let mut format = ConsoleFormat::default()
     if self.configuration.use_colors {
-      // Find if current char has syntax highlight
       for span in sorted_spans {
         if i >= span.start && i < span.start + span.length {
           format = span.format
           break
         }
       }
-      // Apply selection background if needed
-      match self.selection {
-        Some(sel) =>
-          if sel.contains(i) {
-            format = {
-              ..format,
-              background: self.configuration.selection_background,
-            }
+      if self.selection is Some(sel) {
+        if sel.contains(i) {
+          format = {
+            ..format,
+            background: self.configuration.selection_background,
           }
-        None => ()
+        }
       }
     }
     new_screen.draw_string(0, current_col, chars[i].to_string(), format)
     current_col = current_col + get_char_width(chars[i])
   }
-
   new_screen.cursor_row = 0
   new_screen.cursor_col = prompt_width + get_chars_width(left.iter())
 
-  // 2. Draw completion menu
+  // 2. Draw Parameter Overloads (if any)
+  let mut next_row = 1
+  if self.overload_state is Some(state) {
+    for i in 0..<overload_items_count {
+      let item = state.items[i]
+      let format = if i == state.selected_index {
+        ConsoleFormat::new(bold=true)
+      } else {
+        ConsoleFormat::default()
+      }
+      let prefix = if i == state.selected_index { "* " } else { "  " }
+      new_screen.draw_string(next_row, 0, prefix + item.signature, format)
+      next_row = next_row + 1
+    }
+  }
+
+  // 3. Draw Completion Menu + Description Box
   if self.completion_state is Some(state) {
     let start = if state.selected_index < 2 {
       0
     } else {
       state.selected_index - 2
     }
+    let menu_max_width = 30 // Simplified
     for i in 0..<completion_items_count {
       let item_index = start + i
       if item_index >= state.items.length() {
         break
       }
       let item = state.items[item_index]
-      let row = 1 + i
-      let format = if item_index == state.selected_index &&
-        self.configuration.use_colors {
+      let row = next_row + i
+      let is_selected = item_index == state.selected_index
+      let format = if is_selected && self.configuration.use_colors {
         ConsoleFormat::new(bold=true, underline=true)
       } else {
         ConsoleFormat::default()
       }
-      let prefix = if item_index == state.selected_index { "> " } else { "  " }
+      let prefix = if is_selected { "> " } else { "  " }
       new_screen.draw_string(row, 0, prefix + item.display_text, format)
+
+      // Draw side description for selected item
+      if is_selected && item.description != "" {
+        new_screen.draw_string(
+          row,
+          menu_max_width,
+          " │ \{item.description}",
+          ConsoleFormat::default(),
+        )
+      }
     }
   }
 
-  // 3. Render Diff
+  // 4. Render Diff
   let base_row = self.console.get_cursor_top()
-  let old_screen_val = match self.last_screen {
-    Some(s) => s
-    None => Screen::new(height, width)
-  }
+  let old_screen_val = self.last_screen.unwrap_or_else(() => {
+    Screen::new(height, width)
+  })
   render_diff(self.console, new_screen, old_screen_val, base_row, 1)
   self.last_screen = Some(new_screen)
 }
