@@ -88,6 +88,10 @@ pub struct KeyBindings {
   move_end_selection : KeyPressPatterns
   copy_selection : KeyPressPatterns
   cut_selection : KeyPressPatterns
+  kill_line_tail : KeyPressPatterns
+  kill_line_head : KeyPressPatterns
+  yank : KeyPressPatterns
+  yank_pop : KeyPressPatterns
 }
 
 ///|
@@ -231,6 +235,26 @@ fn default_cut_selection_patterns() -> KeyPressPatterns {
 }
 
 ///|
+fn default_kill_line_tail_patterns() -> KeyPressPatterns {
+  @console.K |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_kill_line_head_patterns() -> KeyPressPatterns {
+  @console.U |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_yank_patterns() -> KeyPressPatterns {
+  @console.Y |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_yank_pop_patterns() -> KeyPressPatterns {
+  @console.Y |> KeyPressPattern::new(alt=true) |> KeyPressPatterns::single
+}
+
+///|
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns(),
   cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns(),
@@ -256,6 +280,10 @@ pub fn KeyBindings::new(
   move_end_selection? : KeyPressPatterns = default_move_end_selection_patterns(),
   copy_selection? : KeyPressPatterns = default_copy_selection_patterns(),
   cut_selection? : KeyPressPatterns = default_cut_selection_patterns(),
+  kill_line_tail? : KeyPressPatterns = default_kill_line_tail_patterns(),
+  kill_line_head? : KeyPressPatterns = default_kill_line_head_patterns(),
+  yank? : KeyPressPatterns = default_yank_patterns(),
+  yank_pop? : KeyPressPatterns = default_yank_pop_patterns(),
 ) -> KeyBindings {
   {
     submit_prompt,
@@ -282,6 +310,10 @@ pub fn KeyBindings::new(
     move_end_selection,
     copy_selection,
     cut_selection,
+    kill_line_tail,
+    kill_line_head,
+    yank,
+    yank_pop,
   }
 }
 
@@ -301,6 +333,7 @@ pub struct PromptConfiguration {
   selection_background : AnsiColor
   use_colors : Bool
   max_completion_items_count : Int
+  kill_ring_max_size : Int
 }
 
 ///|
@@ -314,6 +347,7 @@ pub fn PromptConfiguration::new(
   selection_background? : AnsiColor = Blue,
   use_colors? : Bool = true,
   max_completion_items_count? : Int = 5,
+  kill_ring_max_size? : Int = 20,
 ) -> PromptConfiguration {
   {
     prompt,
@@ -325,10 +359,11 @@ pub fn PromptConfiguration::new(
     selection_background,
     use_colors,
     max_completion_items_count,
+    kill_ring_max_size,
   }
 }
 
 ///|
-pub impl Default for PromptConfiguration with default() {
+pub fn PromptConfiguration::default() -> PromptConfiguration {
   PromptConfiguration::new()
 }

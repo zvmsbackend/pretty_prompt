@@ -21,6 +21,8 @@ pub fn read_key_presses(&ConsolePort) -> Array[KeyPress]
 
 pub fn render_diff(&ConsolePort, Screen, Screen, Int, Int) -> Unit
 
+pub fn wrap_text(String, Int, Int) -> WrappedText
+
 // Errors
 pub suberror ClipboardPortError {
   NotAvailable
@@ -165,8 +167,12 @@ pub struct KeyBindings {
   move_end_selection : KeyPressPatterns
   copy_selection : KeyPressPatterns
   cut_selection : KeyPressPatterns
+  kill_line_tail : KeyPressPatterns
+  kill_line_head : KeyPressPatterns
+  yank : KeyPressPatterns
+  yank_pop : KeyPressPatterns
 }
-pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns, move_left_selection? : KeyPressPatterns, move_right_selection? : KeyPressPatterns, move_home_selection? : KeyPressPatterns, move_end_selection? : KeyPressPatterns, copy_selection? : KeyPressPatterns, cut_selection? : KeyPressPatterns) -> Self
+pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns, move_left_selection? : KeyPressPatterns, move_right_selection? : KeyPressPatterns, move_home_selection? : KeyPressPatterns, move_end_selection? : KeyPressPatterns, copy_selection? : KeyPressPatterns, cut_selection? : KeyPressPatterns, kill_line_tail? : KeyPressPatterns, kill_line_head? : KeyPressPatterns, yank? : KeyPressPatterns, yank_pop? : KeyPressPatterns) -> Self
 
 pub struct KeyPress {
   console_key_info : @console.ConsoleKeyInfo
@@ -185,6 +191,16 @@ pub fn KeyPressPatterns::has_any(Self) -> Bool
 pub fn KeyPressPatterns::matches(Self, @console.ConsoleKeyInfo) -> Bool
 pub fn KeyPressPatterns::new(Array[KeyPressPattern]) -> Self
 pub fn KeyPressPatterns::single(KeyPressPattern) -> Self
+
+pub struct KillRing {
+  items : Array[String]
+  mut current_index : Int
+  max_size : Int
+}
+pub fn KillRing::add(Self, String) -> Unit
+pub fn KillRing::new(max_size? : Int) -> Self
+pub fn KillRing::yank(Self) -> String?
+pub fn KillRing::yank_pop(Self) -> String?
 
 pub struct OverloadItem {
   signature : String
@@ -222,6 +238,7 @@ pub struct Prompt {
   undo_manager : UndoManager
   mut selection : Selection?
   mut overload_state : OverloadState?
+  kill_ring : KillRing
 }
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
@@ -239,9 +256,10 @@ pub struct PromptConfiguration {
   selection_background : AnsiColor
   use_colors : Bool
   max_completion_items_count : Int
+  kill_ring_max_size : Int
 }
-pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], overload_provider? : async (String, Int) -> Array[OverloadItem], selection_background? : AnsiColor, use_colors? : Bool, max_completion_items_count? : Int) -> Self
-pub impl Default for PromptConfiguration
+pub fn PromptConfiguration::default() -> Self
+pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], overload_provider? : async (String, Int) -> Array[OverloadItem], selection_background? : AnsiColor, use_colors? : Bool, max_completion_items_count? : Int, kill_ring_max_size? : Int) -> Self
 
 pub struct PromptResult {
   is_success : Bool
@@ -289,6 +307,12 @@ pub struct UndoRecord {
   cursor_pos : Int
 }
 pub fn UndoRecord::new(String, Int) -> Self
+
+pub struct WrappedText {
+  lines : Array[String]
+  cursor_row : Int
+  cursor_col : Int
+}
 
 // Type aliases
 
