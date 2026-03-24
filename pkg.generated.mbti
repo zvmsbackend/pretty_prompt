@@ -158,8 +158,14 @@ pub struct KeyBindings {
   dismiss_completion : KeyPressPatterns
   undo : KeyPressPatterns
   redo : KeyPressPatterns
+  move_left_selection : KeyPressPatterns
+  move_right_selection : KeyPressPatterns
+  move_home_selection : KeyPressPatterns
+  move_end_selection : KeyPressPatterns
+  copy_selection : KeyPressPatterns
+  cut_selection : KeyPressPatterns
 }
-pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns) -> Self
+pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns, move_left_selection? : KeyPressPatterns, move_right_selection? : KeyPressPatterns, move_home_selection? : KeyPressPatterns, move_end_selection? : KeyPressPatterns, copy_selection? : KeyPressPatterns, cut_selection? : KeyPressPatterns) -> Self
 
 pub struct KeyPress {
   console_key_info : @console.ConsoleKeyInfo
@@ -194,6 +200,7 @@ pub struct Prompt {
   mut completion_state : CompletionState?
   mut last_screen : Screen?
   undo_manager : UndoManager
+  mut selection : Selection?
 }
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
@@ -207,9 +214,10 @@ pub struct PromptConfiguration {
   history : HistoryConfiguration
   highlighter : async (String) -> Array[FormatSpan]
   completer : async (String, Int) -> Array[CompletionItem]
+  selection_background : AnsiColor
 }
 pub fn PromptConfiguration::default() -> Self
-pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem]) -> Self
+pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], selection_background? : AnsiColor) -> Self
 
 pub struct PromptResult {
   is_success : Bool
@@ -228,6 +236,14 @@ pub struct Screen {
 }
 pub fn Screen::draw_string(Self, Int, Int, String, ConsoleFormat) -> Unit
 pub fn Screen::new(Int, Int) -> Self
+
+pub struct Selection {
+  anchor : Int
+  mut active : Int
+}
+pub fn Selection::contains(Self, Int) -> Bool
+pub fn Selection::new(Int, Int) -> Self
+pub fn Selection::range(Self) -> (Int, Int)
 
 pub struct SystemClipboardPort {
 }

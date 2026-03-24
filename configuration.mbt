@@ -82,6 +82,12 @@ pub struct KeyBindings {
   dismiss_completion : KeyPressPatterns
   undo : KeyPressPatterns
   redo : KeyPressPatterns
+  move_left_selection : KeyPressPatterns
+  move_right_selection : KeyPressPatterns
+  move_home_selection : KeyPressPatterns
+  move_end_selection : KeyPressPatterns
+  copy_selection : KeyPressPatterns
+  cut_selection : KeyPressPatterns
 }
 
 ///|
@@ -191,6 +197,36 @@ fn default_redo_patterns() -> KeyPressPatterns {
 }
 
 ///|
+fn default_move_left_selection_patterns() -> KeyPressPatterns {
+  @console.LeftArrow |> KeyPressPattern::new(shift=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_move_right_selection_patterns() -> KeyPressPatterns {
+  @console.RightArrow |> KeyPressPattern::new(shift=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_move_home_selection_patterns() -> KeyPressPatterns {
+  @console.Home |> KeyPressPattern::new(shift=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_move_end_selection_patterns() -> KeyPressPatterns {
+  @console.End |> KeyPressPattern::new(shift=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_copy_selection_patterns() -> KeyPressPatterns {
+  @console.C |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_cut_selection_patterns() -> KeyPressPatterns {
+  @console.X |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
+}
+
+///|
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns(),
   cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns(),
@@ -210,6 +246,12 @@ pub fn KeyBindings::new(
   dismiss_completion? : KeyPressPatterns = default_dismiss_completion_patterns(),
   undo? : KeyPressPatterns = default_undo_patterns(),
   redo? : KeyPressPatterns = default_redo_patterns(),
+  move_left_selection? : KeyPressPatterns = default_move_left_selection_patterns(),
+  move_right_selection? : KeyPressPatterns = default_move_right_selection_patterns(),
+  move_home_selection? : KeyPressPatterns = default_move_home_selection_patterns(),
+  move_end_selection? : KeyPressPatterns = default_move_end_selection_patterns(),
+  copy_selection? : KeyPressPatterns = default_copy_selection_patterns(),
+  cut_selection? : KeyPressPatterns = default_cut_selection_patterns(),
 ) -> KeyBindings {
   {
     submit_prompt,
@@ -230,6 +272,12 @@ pub fn KeyBindings::new(
     dismiss_completion,
     undo,
     redo,
+    move_left_selection,
+    move_right_selection,
+    move_home_selection,
+    move_end_selection,
+    copy_selection,
+    cut_selection,
   }
 }
 
@@ -245,6 +293,7 @@ pub struct PromptConfiguration {
   history : HistoryConfiguration
   highlighter : async (String) -> Array[FormatSpan]
   completer : async (String, Int) -> Array[CompletionItem]
+  selection_background : AnsiColor
 }
 
 ///|
@@ -254,8 +303,16 @@ pub fn PromptConfiguration::new(
   history? : HistoryConfiguration = HistoryConfiguration::default(),
   highlighter? : async (String) -> Array[FormatSpan] = _ => [],
   completer? : async (String, Int) -> Array[CompletionItem] = (_, _) => [],
+  selection_background? : AnsiColor = Blue,
 ) -> PromptConfiguration {
-  { prompt, key_bindings, history, highlighter, completer }
+  {
+    prompt,
+    key_bindings,
+    history,
+    highlighter,
+    completer,
+    selection_background,
+  }
 }
 
 ///|

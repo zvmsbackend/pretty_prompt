@@ -8,6 +8,7 @@ pub struct Prompt {
   mut completion_state : CompletionState?
   mut last_screen : Screen?
   undo_manager : UndoManager
+  mut selection : Selection?
 }
 
 ///|
@@ -28,6 +29,7 @@ pub async fn Prompt::new(
     completion_state: None,
     last_screen: None,
     undo_manager: UndoManager::new("", 0),
+    selection: None,
   }
 }
 
@@ -57,6 +59,7 @@ pub async fn Prompt::read_line_with_prompt(
     for key_press in key_presses {
       if key_press.pasted_text is Some(pasted) {
         self.completion_state = None
+        self.delete_selection(left, right)
         left.push_iter(pasted.iter())
         self.track_undo(left, right)
         self.render_line(prompt, left, right)
@@ -65,15 +68,16 @@ pub async fn Prompt::read_line_with_prompt(
 
       let info = key_press.console_key_info
 
-      // 1. Check for global/mode-switching keys
+      // 1. Global keys
       if key_bindings.cancel_prompt.matches(info) {
         self.completion_state = None
+        self.selection = None
         self.console.write_line("")
         self.cancel_controller.set_mode(AllowCancelSignal)
         return PromptResult::cancelled(info)
       }
 
-      // 2. Handle Completion Mode
+      // 2. Completion Mode
       if self.completion_state is Some(state) {
         if key_bindings.dismiss_completion.matches(info) {
           self.completion_state = None
@@ -101,7 +105,6 @@ pub async fn Prompt::read_line_with_prompt(
           key_bindings.trigger_completion.matches(info) {
           if state.items.length() > 0 {
             let item = state.items[state.selected_index]
-            // 双向精准替换
             while left.length() > 0 &&
                   is_word_character(left[left.length() - 1]) {
               ignore(left.pop())
@@ -119,9 +122,56 @@ pub async fn Prompt::read_line_with_prompt(
         }
       }
 
-      // 3. Undo/Redo
+      // 3. Selection specific keys
+      if key_bindings.copy_selection.matches(info) {
+        if self.selection is Some(sel) {
+          let (start, end) = sel.range()
+          let text = line_from_buffers(left, right)
+          let selected_text = text.sub(start~, end~).to_string()
+          let _ = self.clipboard.write_text(selected_text) catch { _ => () }
+        }
+        continue
+      }
+
+      if key_bindings.cut_selection.matches(info) {
+        if self.selection is Some(sel) {
+          let (start, end) = sel.range()
+          let text = line_from_buffers(left, right)
+          let selected_text = text.sub(start~, end~).to_string()
+          let _ = self.clipboard.write_text(selected_text) catch { _ => () }
+          self.delete_selection(left, right)
+          self.track_undo(left, right)
+          self.render_line(prompt, left, right)
+        }
+        continue
+      }
+
+      // 4. Movement with Selection
+      if key_bindings.move_left_selection.matches(info) {
+        self.handle_selection_movement(left, right, -1)
+        self.render_line(prompt, left, right)
+        continue
+      }
+      if key_bindings.move_right_selection.matches(info) {
+        self.handle_selection_movement(left, right, 1)
+        self.render_line(prompt, left, right)
+        continue
+      }
+      if key_bindings.move_home_selection.matches(info) {
+        self.handle_selection_movement(left, right, -left.length())
+        self.render_line(prompt, left, right)
+        continue
+      }
+      if key_bindings.move_end_selection.matches(info) {
+        self.handle_selection_movement(left, right, right.length())
+        self.render_line(prompt, left, right)
+        continue
+      }
+
+      // 5. Undo/Redo
       if key_bindings.undo.matches(info) {
         self.completion_state = None
+        self.selection = None
         if self.undo_manager.undo() is Some(record) {
           self.apply_undo_record(left, right, record)
           self.render_line(prompt, left, right)
@@ -131,6 +181,7 @@ pub async fn Prompt::read_line_with_prompt(
 
       if key_bindings.redo.matches(info) {
         self.completion_state = None
+        self.selection = None
         if self.undo_manager.redo() is Some(record) {
           self.apply_undo_record(left, right, record)
           self.render_line(prompt, left, right)
@@ -138,7 +189,7 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // 4. Trigger Completion
+      // 6. Trigger Completion
       if key_bindings.trigger_completion.matches(info) {
         let raw_line = line_from_buffers(left, right)
         let items = (self.configuration.completer)(raw_line, left.length())
@@ -156,9 +207,10 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // 5. Standard Keys
+      // 7. Standard Keys
       if key_bindings.history_previous.matches(info) {
         self.completion_state = None
+        self.selection = None
         if self.history.navigate_previous(line_from_buffers(left, right))
           is Some(entry) {
           set_line_buffers(left, right, entry)
@@ -170,6 +222,7 @@ pub async fn Prompt::read_line_with_prompt(
 
       if key_bindings.history_next.matches(info) {
         self.completion_state = None
+        self.selection = None
         if self.history.navigate_next() is Some(entry) {
           set_line_buffers(left, right, entry)
           self.track_undo(left, right)
@@ -182,6 +235,7 @@ pub async fn Prompt::read_line_with_prompt(
 
       if key_bindings.submit_prompt.matches(info) {
         self.completion_state = None
+        self.selection = None
         let line = line_from_buffers(left, right)
         self.history.track_submission(line)
         self.console.write("\r")
@@ -193,7 +247,11 @@ pub async fn Prompt::read_line_with_prompt(
       }
 
       if key_bindings.backward_delete_character.matches(info) {
-        if left.pop() is Some(_) {
+        if self.selection is Some(_) {
+          self.delete_selection(left, right)
+          self.track_undo(left, right)
+          self.render_line(prompt, left, right)
+        } else if left.pop() is Some(_) {
           if self.completion_state is Some(state) {
             update_completion_filter(state, left)
           }
@@ -204,7 +262,11 @@ pub async fn Prompt::read_line_with_prompt(
       }
 
       if key_bindings.delete_character.matches(info) {
-        if right.pop() is Some(_) {
+        if self.selection is Some(_) {
+          self.delete_selection(left, right)
+          self.track_undo(left, right)
+          self.render_line(prompt, left, right)
+        } else if right.pop() is Some(_) {
           self.completion_state = None
           self.track_undo(left, right)
           self.render_line(prompt, left, right)
@@ -213,6 +275,7 @@ pub async fn Prompt::read_line_with_prompt(
       }
 
       if key_bindings.move_left.matches(info) {
+        self.selection = None
         if left.pop() is Some(ch) {
           right.push(ch)
           self.completion_state = None
@@ -222,6 +285,7 @@ pub async fn Prompt::read_line_with_prompt(
       }
 
       if key_bindings.move_right.matches(info) {
+        self.selection = None
         if right.pop() is Some(ch) {
           left.push(ch)
           self.completion_state = None
@@ -232,6 +296,7 @@ pub async fn Prompt::read_line_with_prompt(
 
       let ch = info.key_char
       if !ch.is_control() {
+        self.delete_selection(left, right)
         left.push(ch)
         if self.completion_state is Some(state) {
           update_completion_filter(state, left)
@@ -248,6 +313,68 @@ pub async fn Prompt::read_line_with_prompt(
     }
   }
   cancel_result()
+}
+
+///|
+fn Prompt::handle_selection_movement(
+  self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+  delta : Int,
+) -> Unit {
+  let old_pos = left.length()
+  // Move cursor
+  if delta < 0 {
+    for _ in 0..<-delta {
+      if left.pop() is Some(ch) {
+        right.push(ch)
+      }
+    }
+  } else {
+    for _ in 0..<delta {
+      if right.pop() is Some(ch) {
+        left.push(ch)
+      }
+    }
+  }
+  let new_pos = left.length()
+
+  match self.selection {
+    None => self.selection = Some(Selection::new(old_pos, new_pos))
+    Some(sel) => {
+      sel.active = new_pos
+      if sel.anchor == sel.active {
+        self.selection = None
+      }
+    }
+  }
+}
+
+///|
+fn Prompt::delete_selection(
+  self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+) -> Unit {
+  match self.selection {
+    None => ()
+    Some(sel) => {
+      let (start, end) = sel.range()
+      let text = line_from_buffers(left, right)
+      let chars = text.to_array()
+      left.clear()
+      right.clear()
+      for i in 0..<start {
+        if i < chars.length() {
+          left.push(chars[i])
+        }
+      }
+      for i in chars.length()>..end {
+        right.push(chars[i])
+      }
+      self.selection = None
+    }
+  }
 }
 
 ///|
@@ -356,38 +483,29 @@ async fn Prompt::render_line(
   let sorted_spans = spans.copy()
   sorted_spans.sort_by_key(span => span.start)
   let chars = raw_line.to_array()
-  let mut current_pos = 0
-  for span in sorted_spans {
-    if span.start >= current_pos {
-      for i in current_pos..<span.start {
-        new_screen.draw_string(
-          0,
-          current_col,
-          chars[i].to_string(),
-          ConsoleFormat::default(),
-        )
-        current_col = current_col + get_char_width(chars[i])
+
+  // Combine syntax highlighting spans with selection background
+  for i in 0..<chars.length() {
+    let mut format = ConsoleFormat::default()
+    // Find if current char has syntax highlight
+    for span in sorted_spans {
+      if i >= span.start && i < span.start + span.length {
+        format = span.format
+        break
       }
-      let end = @cmp.minimum(span.start + span.length, chars.length())
-      for i in span.start..<end {
-        new_screen.draw_string(
-          0,
-          current_col,
-          chars[i].to_string(),
-          span.format,
-        )
-        current_col = current_col + get_char_width(chars[i])
-      }
-      current_pos = end
     }
-  }
-  for i in current_pos..<chars.length() {
-    new_screen.draw_string(
-      0,
-      current_col,
-      chars[i].to_string(),
-      ConsoleFormat::default(),
-    )
+    // Apply selection background if needed
+    match self.selection {
+      Some(sel) =>
+        if sel.contains(i) {
+          format = {
+            ..format,
+            background: self.configuration.selection_background,
+          }
+        }
+      None => ()
+    }
+    new_screen.draw_string(0, current_col, chars[i].to_string(), format)
     current_col = current_col + get_char_width(chars[i])
   }
 
