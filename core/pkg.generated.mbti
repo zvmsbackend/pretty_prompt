@@ -65,20 +65,7 @@ pub fn KeyPressPatterns::matches(Self, @console.ConsoleKeyInfo) -> Bool
 pub fn KeyPressPatterns::new(Array[KeyPressPattern]) -> Self
 pub fn KeyPressPatterns::single(KeyPressPattern) -> Self
 
-pub struct Prompt {
-  console : &@ports.ConsolePort
-  clipboard : &@ports.ClipboardPort
-  configuration : PromptConfiguration
-  history : @editing.HistoryLog
-  cancel_controller : @ports.CancelController
-  mut completion_state : @editing.CompletionState?
-  mut last_screen : @rendering.Screen?
-  undo_manager : @editing.UndoManager
-  mut selection : @editing.Selection?
-  mut overload_state : @editing.OverloadState?
-  kill_ring : @editing.KillRing
-  mut search_state : @editing.SearchState?
-}
+type Prompt
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&@ports.ConsolePort, &@ports.ClipboardPort, configuration? : PromptConfiguration) -> Self
 pub async fn Prompt::read_line(Self) -> PromptResult

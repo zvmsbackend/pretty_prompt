@@ -5,22 +5,23 @@ fn Prompt::run_navigation_modes_handler(
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  if self.completion_state is Some(_) || self.overload_state is Some(_) {
+  if self.pane_state.completion_state is Some(_) ||
+    self.pane_state.overload_state is Some(_) {
     if key_bindings.dismiss_completion.matches(info) {
-      self.completion_state = None
-      self.overload_state = None
+      self.pane_state.completion_state = None
+      self.pane_state.overload_state = None
       state.request_render()
       state.last_was_yank = false
       return Handled
     }
     if key_bindings.history_previous.matches(info) {
-      match self.completion_state {
+      match self.pane_state.completion_state {
         Some(s) =>
           s.set_selected_index(
             cycle_previous_index(s.selected_index, s.items.length()),
           )
         None =>
-          if self.overload_state is Some(s) {
+          if self.pane_state.overload_state is Some(s) {
             s.set_selected_index(
               cycle_previous_index(s.selected_index, s.items.length()),
             )
@@ -31,13 +32,13 @@ fn Prompt::run_navigation_modes_handler(
       return Handled
     }
     if key_bindings.history_next.matches(info) {
-      match self.completion_state {
+      match self.pane_state.completion_state {
         Some(s) =>
           s.set_selected_index(
             cycle_next_index(s.selected_index, s.items.length()),
           )
         None =>
-          if self.overload_state is Some(s) {
+          if self.pane_state.overload_state is Some(s) {
             s.set_selected_index(
               cycle_next_index(s.selected_index, s.items.length()),
             )
@@ -47,7 +48,7 @@ fn Prompt::run_navigation_modes_handler(
       state.last_was_yank = false
       return Handled
     }
-    if self.completion_state is Some(s) {
+    if self.pane_state.completion_state is Some(s) {
       if key_bindings.submit_prompt.matches(info) ||
         key_bindings.trigger_completion.matches(info) {
         if s.items.length() > 0 {
@@ -63,7 +64,7 @@ fn Prompt::run_navigation_modes_handler(
           state.left.push_iter(item.replacement_text.iter())
           self.track_undo(state.left, state.right)
         }
-        self.completion_state = None
+        self.pane_state.completion_state = None
         state.request_render()
         state.last_was_yank = false
         return Handled
@@ -123,9 +124,9 @@ fn Prompt::run_undo_redo_handler(
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
   if key_bindings.undo.matches(info) {
-    self.completion_state = None
-    self.overload_state = None
-    self.selection = None
+    self.pane_state.completion_state = None
+    self.pane_state.overload_state = None
+    self.pane_state.selection = None
     if self.undo_manager.undo() is Some(record) {
       self.apply_undo_record(state.left, state.right, record)
       state.request_render()
@@ -134,9 +135,9 @@ fn Prompt::run_undo_redo_handler(
     return Handled
   }
   if key_bindings.redo.matches(info) {
-    self.completion_state = None
-    self.overload_state = None
-    self.selection = None
+    self.pane_state.completion_state = None
+    self.pane_state.overload_state = None
+    self.pane_state.selection = None
     if self.undo_manager.redo() is Some(record) {
       self.apply_undo_record(state.left, state.right, record)
       state.request_render()
@@ -155,10 +156,10 @@ fn Prompt::run_edit_keys_handler(
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
   if key_bindings.backward_delete_character.matches(info) {
-    if self.selection is Some(_) {
+    if self.pane_state.selection is Some(_) {
       self.delete_selection(state.left, state.right)
     } else if state.left.pop() is Some(_) {
-      if self.completion_state is Some(completion_state) {
+      if self.pane_state.completion_state is Some(completion_state) {
         update_completion_filter(completion_state, state.left)
       }
     }
@@ -168,7 +169,7 @@ fn Prompt::run_edit_keys_handler(
     return Handled
   }
   if key_bindings.delete_character.matches(info) {
-    if self.selection is Some(_) {
+    if self.pane_state.selection is Some(_) {
       self.delete_selection(state.left, state.right)
     } else {
       ignore(state.right.pop())
@@ -179,7 +180,7 @@ fn Prompt::run_edit_keys_handler(
     return Handled
   }
   if key_bindings.move_left.matches(info) {
-    self.selection = None
+    self.pane_state.selection = None
     if state.left.pop() is Some(ch) {
       state.right.push(ch)
     }
@@ -188,7 +189,7 @@ fn Prompt::run_edit_keys_handler(
     return Handled
   }
   if key_bindings.move_right.matches(info) {
-    self.selection = None
+    self.pane_state.selection = None
     if state.right.pop() is Some(ch) {
       state.left.push(ch)
     }
@@ -197,7 +198,7 @@ fn Prompt::run_edit_keys_handler(
     return Handled
   }
   if key_bindings.move_home.matches(info) {
-    self.selection = None
+    self.pane_state.selection = None
     while state.left.pop() is Some(ch) {
       state.right.push(ch)
     }
@@ -206,7 +207,7 @@ fn Prompt::run_edit_keys_handler(
     return Handled
   }
   if key_bindings.move_end.matches(info) {
-    self.selection = None
+    self.pane_state.selection = None
     while state.right.pop() is Some(ch) {
       state.left.push(ch)
     }
@@ -227,13 +228,13 @@ async fn Prompt::run_character_input_handler(
   if !ch.is_control() {
     self.delete_selection(state.left, state.right)
     state.left.push(ch)
-    if self.completion_state is Some(completion_state) {
+    if self.pane_state.completion_state is Some(completion_state) {
       update_completion_filter(completion_state, state.left)
     } else if ch == '.' {
       let raw_line = line_from_buffers(state.left, state.right)
       let items = (self.configuration.completer)(raw_line, state.left.length())
       if items.length() > 0 {
-        self.completion_state = Some(CompletionState::new(items, ""))
+        self.pane_state.completion_state = Some(CompletionState::new(items, ""))
       }
     } else if ch == '(' {
       let raw_line = line_from_buffers(state.left, state.right)
@@ -242,7 +243,7 @@ async fn Prompt::run_character_input_handler(
         state.left.length(),
       )
       if overloads.length() > 0 {
-        self.overload_state = Some(OverloadState::new(overloads))
+        self.pane_state.overload_state = Some(OverloadState::new(overloads))
       }
     }
     self.track_undo(state.left, state.right)

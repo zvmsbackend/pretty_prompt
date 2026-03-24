@@ -5,7 +5,7 @@ fn Prompt::run_search_mode_handler(
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
-  if self.search_state is Some(search_state) {
+  if self.pane_state.search_state is Some(search_state) {
     if key_bindings.reverse_search.matches(info) {
       if self.history.navigate_search(
           search_state.query,
@@ -19,12 +19,12 @@ fn Prompt::run_search_mode_handler(
       return Handled
     }
     if key_bindings.dismiss_completion.matches(info) {
-      self.search_state = None
+      self.pane_state.search_state = None
       state.request_render()
       return Handled
     }
     if key_bindings.submit_prompt.matches(info) {
-      self.search_state = None
+      self.pane_state.search_state = None
       state.request_render()
       return Handled
     }
@@ -53,7 +53,7 @@ fn Prompt::run_search_mode_handler(
       state.request_render()
       return Handled
     }
-    self.search_state = None
+    self.pane_state.search_state = None
   }
   NotHandled
 }
@@ -66,9 +66,9 @@ fn Prompt::run_search_trigger_handler(
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
   if key_bindings.reverse_search.matches(info) {
-    self.completion_state = None
-    self.overload_state = None
-    self.search_state = Some(SearchState::new())
+    self.pane_state.completion_state = None
+    self.pane_state.overload_state = None
+    self.pane_state.search_state = Some(SearchState::new())
     state.request_render()
     return Handled
   }
@@ -90,7 +90,7 @@ async fn Prompt::run_completion_and_history_handler(
         .rev_iter()
         .take_while(is_word_character)
         .collect()
-      self.completion_state = Some(
+      self.pane_state.completion_state = Some(
         CompletionState::new(items, String::from_array(prefix_chars.rev())),
       )
       state.request_render()
@@ -98,8 +98,8 @@ async fn Prompt::run_completion_and_history_handler(
     return Handled
   }
   if key_bindings.history_previous.matches(info) {
-    self.completion_state = None
-    self.selection = None
+    self.pane_state.completion_state = None
+    self.pane_state.selection = None
     if self.history.navigate_previous(
         line_from_buffers(state.left, state.right),
       )
@@ -111,8 +111,8 @@ async fn Prompt::run_completion_and_history_handler(
     return Handled
   }
   if key_bindings.history_next.matches(info) {
-    self.completion_state = None
-    self.selection = None
+    self.pane_state.completion_state = None
+    self.pane_state.selection = None
     if self.history.navigate_next() is Some(entry) {
       self.set_line_buffers(state.left, state.right, entry)
       self.track_undo(state.left, state.right)

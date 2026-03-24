@@ -6,7 +6,7 @@ fn Prompt::run_selection_clipboard_handler(
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
   if key_bindings.copy_selection.matches(info) {
-    if self.selection is Some(sel) {
+    if self.pane_state.selection is Some(sel) {
       let (start, end) = sel.range()
       let text = line_from_buffers(state.left, state.right)
       let selected_text = text.sub(start~, end~).to_string()
@@ -16,7 +16,7 @@ fn Prompt::run_selection_clipboard_handler(
     return Handled
   }
   if key_bindings.cut_selection.matches(info) {
-    if self.selection is Some(sel) {
+    if self.pane_state.selection is Some(sel) {
       let (start, end) = sel.range()
       let text = line_from_buffers(state.left, state.right)
       let selected_text = text.sub(start~, end~).to_string()

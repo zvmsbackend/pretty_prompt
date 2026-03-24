@@ -3,9 +3,9 @@ fn Prompt::run_cancel_prompt_handler(
   self : Prompt,
   info : @console.ConsoleKeyInfo,
 ) -> PromptResult {
-  self.completion_state = None
-  self.overload_state = None
-  self.selection = None
+  self.pane_state.completion_state = None
+  self.pane_state.overload_state = None
+  self.pane_state.selection = None
   self.console.write_line("")
   self.cancel_controller.set_mode(AllowCancelSignal)
   PromptResult::cancelled(info)
@@ -25,9 +25,9 @@ async fn Prompt::run_submit_or_cancel_handler(
   }
 
   if key_bindings.submit_prompt.matches(info) {
-    self.completion_state = None
-    self.overload_state = None
-    self.selection = None
+    self.pane_state.completion_state = None
+    self.pane_state.overload_state = None
+    self.pane_state.selection = None
     let line = line_from_buffers(state.left, state.right)
     self.history.track_submission(line)
     self.console.write_line("")

@@ -28,19 +28,34 @@ using @editing {
 }
 
 ///|
-pub struct Prompt {
+priv struct PaneState {
+  mut completion_state : CompletionState?
+  mut selection : Selection?
+  mut overload_state : OverloadState?
+  mut search_state : SearchState?
+}
+
+///|
+fn PaneState::new() -> PaneState {
+  {
+    completion_state: None,
+    selection: None,
+    overload_state: None,
+    search_state: None,
+  }
+}
+
+///|
+struct Prompt {
   console : &ConsolePort
   clipboard : &ClipboardPort
   configuration : PromptConfiguration
   history : HistoryLog
   cancel_controller : CancelController
-  mut completion_state : CompletionState?
+  mut pane_state : PaneState
   mut last_screen : Screen?
   undo_manager : UndoManager
-  mut selection : Selection?
-  mut overload_state : OverloadState?
   kill_ring : KillRing
-  mut search_state : SearchState?
 }
 
 ///|
@@ -58,13 +73,10 @@ pub async fn Prompt::new(
     configuration,
     history,
     cancel_controller,
-    completion_state: None,
+    pane_state: PaneState::new(),
     last_screen: None,
     undo_manager: UndoManager::new("", 0),
-    selection: None,
-    overload_state: None,
     kill_ring: KillRing::new(max_size=configuration.kill_ring_max_size),
-    search_state: None,
   }
 }
 
@@ -119,9 +131,9 @@ async fn Prompt::process_key_press(
   }
 
   if key_press.pasted_text is Some(pasted) {
-    self.completion_state = None
-    self.overload_state = None
-    self.search_state = None
+    self.pane_state.completion_state = None
+    self.pane_state.overload_state = None
+    self.pane_state.search_state = None
     self.delete_selection(state.left, state.right)
     state.left.push_iter(pasted.iter())
     self.track_undo(state.left, state.right)
@@ -130,12 +142,12 @@ async fn Prompt::process_key_press(
     return self.commit_requested_render(prompt, state)
   }
 
-  self.run_key_handler_pipeline(
+  self.run_pane_pipeline(
     prompt,
     state,
     key_bindings,
     info,
-    default_key_handler_pipeline(),
+    default_pane_pipeline(),
   )
 }
 
@@ -296,12 +308,12 @@ fn Prompt::handle_selection_movement(
     }
   }
   let new_pos = left.length()
-  match self.selection {
-    None => self.selection = Some(Selection::new(old_pos, new_pos))
+  match self.pane_state.selection {
+    None => self.pane_state.selection = Some(Selection::new(old_pos, new_pos))
     Some(sel) => {
       sel.set_active(new_pos)
       if sel.anchor == sel.active {
-        self.selection = None
+        self.pane_state.selection = None
       }
     }
   }
@@ -313,7 +325,7 @@ fn Prompt::delete_selection(
   left : Array[Char],
   right : Array[Char],
 ) -> Unit {
-  if self.selection is Some(sel) {
+  if self.pane_state.selection is Some(sel) {
     let (start, end) = sel.range()
     let text = line_from_buffers(left, right)
     let chars = text.to_array()
@@ -327,7 +339,7 @@ fn Prompt::delete_selection(
     for i in chars.length()>..end {
       right.push(chars[i])
     }
-    self.selection = None
+    self.pane_state.selection = None
   }
 }
 
@@ -421,7 +433,7 @@ async fn Prompt::render_line(
   let max_items = self.configuration.max_completion_items_count
 
   // 1. Determine Prompt Text & Style
-  let active_prompt = match self.search_state {
+  let active_prompt = match self.pane_state.search_state {
     Some(s) =>
       FormattedString::new("(reverse-i-search)'\{s.query}': ", spans=[
         FormatSpan::new(0, 18, ConsoleFormat::new(bold=true, foreground=Cyan)),
@@ -440,7 +452,7 @@ async fn Prompt::render_line(
   )
 
   // 2. Calculate heights
-  let completion_items_count = match self.completion_state {
+  let completion_items_count = match self.pane_state.completion_state {
     Some(state) =>
       if state.items.length() < max_items {
         state.items.length()
@@ -449,7 +461,7 @@ async fn Prompt::render_line(
       }
     None => 0
   }
-  let overload_items_count = match self.overload_state {
+  let overload_items_count = match self.pane_state.overload_state {
     Some(state) =>
       if state.items.length() < 3 {
         state.items.length()
@@ -501,7 +513,7 @@ async fn Prompt::render_line(
               break
             }
           }
-          if self.selection is Some(sel) {
+          if self.pane_state.selection is Some(sel) {
             if sel.contains(i) {
               format = format.with_background(
                 self.configuration.selection_background,
@@ -524,7 +536,7 @@ async fn Prompt::render_line(
 
   // 5. Draw Overloads & Completions
   let mut next_row = wrapped.lines.length()
-  if self.overload_state is Some(state) {
+  if self.pane_state.overload_state is Some(state) {
     for i in 0..<overload_items_count {
       let item = state.items[i]
       let format = if i == state.selected_index {
@@ -536,7 +548,7 @@ async fn Prompt::render_line(
       next_row = next_row + 1
     }
   }
-  if self.completion_state is Some(state) {
+  if self.pane_state.completion_state is Some(state) {
     let start = if state.selected_index < 2 {
       0
     } else {

@@ -37,7 +37,7 @@ fn InputState::take_render_requested(self : InputState) -> Bool {
 }
 
 ///|
-priv enum KeyHandlerEntry {
+priv enum PaneEntry {
   SearchModeHandler
   NavigationModesHandler
   SearchTriggerHandler
@@ -52,21 +52,33 @@ priv enum KeyHandlerEntry {
 }
 
 ///|
-priv trait KeyHandler {
-  supports_phase(Self, KeyPhase) -> Bool
-  async handle(
-    Self,
-    Prompt,
-    FormattedString,
-    InputState,
-    KeyBindings,
-    @console.ConsoleKeyInfo,
-    KeyPhase,
-  ) -> KeyProcessingResult
+priv struct PaneContext {
+  runtime : Prompt
+  prompt : FormattedString
+  state : InputState
+  key_bindings : KeyBindings
+  info : @console.ConsoleKeyInfo
 }
 
 ///|
-impl KeyHandler for KeyHandlerEntry with supports_phase(self, phase) {
+fn PaneContext::new(
+  runtime : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> PaneContext {
+  { runtime, prompt, state, key_bindings, info }
+}
+
+///|
+priv trait Pane {
+  supports_phase(Self, KeyPhase) -> Bool
+  async on_key(Self, PaneContext, KeyPhase) -> KeyProcessingResult
+}
+
+///|
+impl Pane for PaneEntry with supports_phase(self, phase) {
   match phase {
     KeyDown => true
     KeyUp => self is CharacterInputHandler
@@ -74,24 +86,27 @@ impl KeyHandler for KeyHandlerEntry with supports_phase(self, phase) {
 }
 
 ///|
-impl KeyHandler for KeyHandlerEntry with handle(
-  self,
-  runtime,
-  prompt,
-  state,
-  key_bindings,
-  info,
-  phase,
-) {
+impl Pane for PaneEntry with on_key(self, context, phase) {
+  let runtime = context.runtime
+  let prompt = context.prompt
+  let state = context.state
+  let key_bindings = context.key_bindings
+  let info = context.info
   match phase {
     KeyDown =>
       match self {
         SearchModeHandler =>
-          runtime.handle_search_mode(state, key_bindings, info)
+          SearchPane::new().handle_search_mode(
+            runtime, state, key_bindings, info,
+          )
         NavigationModesHandler =>
-          runtime.handle_navigation_modes(state, key_bindings, info)
+          CompletionPane::new().handle_navigation_modes(
+            runtime, state, key_bindings, info,
+          )
         SearchTriggerHandler =>
-          runtime.handle_search_trigger(state, key_bindings, info)
+          SearchPane::new().handle_search_trigger(
+            runtime, state, key_bindings, info,
+          )
         SelectionClipboardHandler =>
           runtime.handle_selection_clipboard(state, key_bindings, info)
         KillRingHandler => runtime.handle_kill_ring(state, key_bindings, info)
@@ -99,7 +114,9 @@ impl KeyHandler for KeyHandlerEntry with handle(
           runtime.handle_selection_movement_keys(state, key_bindings, info)
         UndoRedoHandler => runtime.handle_undo_redo(state, key_bindings, info)
         CompletionAndHistoryHandler =>
-          runtime.handle_completion_and_history(state, key_bindings, info)
+          CompletionPane::new().handle_completion_and_history(
+            runtime, state, key_bindings, info,
+          )
         SubmitOrCancelHandler =>
           runtime.handle_submit_or_cancel(state, key_bindings, info)
         EditKeysHandler => runtime.handle_edit_keys(state, key_bindings, info)
@@ -110,7 +127,7 @@ impl KeyHandler for KeyHandlerEntry with handle(
 }
 
 ///|
-fn default_key_handler_entries() -> Array[KeyHandlerEntry] {
+fn default_pane_entries() -> Array[PaneEntry] {
   [
     SearchModeHandler,
     NavigationModesHandler,
@@ -127,32 +144,30 @@ fn default_key_handler_entries() -> Array[KeyHandlerEntry] {
 }
 
 ///|
-priv struct KeyHandlerPipeline {
-  handlers : Array[KeyHandlerEntry]
+priv struct PanePipeline {
+  panes : Array[PaneEntry]
 }
 
 ///|
-fn KeyHandlerPipeline::new(
-  handlers : Array[KeyHandlerEntry],
-) -> KeyHandlerPipeline {
-  { handlers, }
+fn PanePipeline::new(panes : Array[PaneEntry]) -> PanePipeline {
+  { panes, }
 }
 
 ///|
-fn default_key_handler_pipeline() -> KeyHandlerPipeline {
-  KeyHandlerPipeline::new(default_key_handler_entries())
+fn default_pane_pipeline() -> PanePipeline {
+  PanePipeline::new(default_pane_entries())
 }
 
 ///|
-async fn Prompt::run_key_handler_pipeline(
+async fn Prompt::run_pane_pipeline(
   self : Prompt,
   prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
-  pipeline : KeyHandlerPipeline,
+  pipeline : PanePipeline,
 ) -> KeyProcessingResult {
-  let down = self.run_key_handler_phase(
+  let down = self.run_pane_phase(
     prompt,
     state,
     key_bindings,
@@ -164,7 +179,7 @@ async fn Prompt::run_key_handler_pipeline(
     return down
   }
 
-  let up = self.run_key_handler_phase(
+  let up = self.run_pane_phase(
     prompt,
     state,
     key_bindings,
@@ -198,20 +213,21 @@ async fn Prompt::commit_requested_render(
 }
 
 ///|
-async fn Prompt::run_key_handler_phase(
+async fn Prompt::run_pane_phase(
   self : Prompt,
   prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
-  pipeline : KeyHandlerPipeline,
+  pipeline : PanePipeline,
   phase : KeyPhase,
 ) -> KeyProcessingResult {
-  for handler in pipeline.handlers {
-    if !handler.supports_phase(phase) {
+  for pane in pipeline.panes {
+    if !pane.supports_phase(phase) {
       continue
     }
-    let result = handler.handle(self, prompt, state, key_bindings, info, phase)
+    let context = PaneContext::new(self, prompt, state, key_bindings, info)
+    let result = pane.on_key(context, phase)
     if !(result is NotHandled) {
       return result
     }
