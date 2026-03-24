@@ -80,6 +80,8 @@ pub struct KeyBindings {
   delete_word : KeyPressPatterns
   trigger_completion : KeyPressPatterns
   dismiss_completion : KeyPressPatterns
+  undo : KeyPressPatterns
+  redo : KeyPressPatterns
 }
 
 ///|
@@ -179,6 +181,16 @@ fn default_dismiss_completion_patterns() -> KeyPressPatterns {
 }
 
 ///|
+fn default_undo_patterns() -> KeyPressPatterns {
+  @console.Z |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
+}
+
+///|
+fn default_redo_patterns() -> KeyPressPatterns {
+  @console.Y |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
+}
+
+///|
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns(),
   cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns(),
@@ -196,6 +208,8 @@ pub fn KeyBindings::new(
   delete_word? : KeyPressPatterns = default_delete_word_patterns(),
   trigger_completion? : KeyPressPatterns = default_trigger_completion_patterns(),
   dismiss_completion? : KeyPressPatterns = default_dismiss_completion_patterns(),
+  undo? : KeyPressPatterns = default_undo_patterns(),
+  redo? : KeyPressPatterns = default_redo_patterns(),
 ) -> KeyBindings {
   {
     submit_prompt,
@@ -214,6 +228,8 @@ pub fn KeyBindings::new(
     delete_word,
     trigger_completion,
     dismiss_completion,
+    undo,
+    redo,
   }
 }
 

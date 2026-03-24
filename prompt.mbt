@@ -7,6 +7,7 @@ pub struct Prompt {
   cancel_controller : CancelController
   mut completion_state : CompletionState?
   mut last_screen : Screen?
+  undo_manager : UndoManager
 }
 
 ///|
@@ -26,6 +27,7 @@ pub async fn Prompt::new(
     cancel_controller,
     completion_state: None,
     last_screen: None,
+    undo_manager: UndoManager::new("", 0),
   }
 }
 
@@ -56,6 +58,7 @@ pub async fn Prompt::read_line_with_prompt(
       if key_press.pasted_text is Some(pasted) {
         self.completion_state = None
         left.push_iter(pasted.iter())
+        self.track_undo(left, right)
         self.render_line(prompt, left, right)
         continue
       }
@@ -108,6 +111,7 @@ pub async fn Prompt::read_line_with_prompt(
               ignore(right.pop())
             }
             left.push_iter(item.replacement_text.iter())
+            self.track_undo(left, right)
           }
           self.completion_state = None
           self.render_line(prompt, left, right)
@@ -115,12 +119,30 @@ pub async fn Prompt::read_line_with_prompt(
         }
       }
 
-      // 3. Trigger Completion
+      // 3. Undo/Redo
+      if key_bindings.undo.matches(info) {
+        self.completion_state = None
+        if self.undo_manager.undo() is Some(record) {
+          self.apply_undo_record(left, right, record)
+          self.render_line(prompt, left, right)
+        }
+        continue
+      }
+
+      if key_bindings.redo.matches(info) {
+        self.completion_state = None
+        if self.undo_manager.redo() is Some(record) {
+          self.apply_undo_record(left, right, record)
+          self.render_line(prompt, left, right)
+        }
+        continue
+      }
+
+      // 4. Trigger Completion
       if key_bindings.trigger_completion.matches(info) {
         let raw_line = line_from_buffers(left, right)
         let items = (self.configuration.completer)(raw_line, left.length())
         if items.length() > 0 {
-          // 获取当前单词作为过滤前缀
           let prefix_chars = left
             .rev_iter()
             .take_while(is_word_character)
@@ -134,12 +156,13 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // 4. Standard Keys
+      // 5. Standard Keys
       if key_bindings.history_previous.matches(info) {
         self.completion_state = None
         if self.history.navigate_previous(line_from_buffers(left, right))
           is Some(entry) {
           set_line_buffers(left, right, entry)
+          self.track_undo(left, right)
           self.render_line(prompt, left, right)
         }
         continue
@@ -149,6 +172,7 @@ pub async fn Prompt::read_line_with_prompt(
         self.completion_state = None
         if self.history.navigate_next() is Some(entry) {
           set_line_buffers(left, right, entry)
+          self.track_undo(left, right)
           self.render_line(prompt, left, right)
         }
         continue
@@ -173,6 +197,7 @@ pub async fn Prompt::read_line_with_prompt(
           if self.completion_state is Some(state) {
             update_completion_filter(state, left)
           }
+          self.track_undo(left, right)
           self.render_line(prompt, left, right)
         }
         continue
@@ -181,6 +206,7 @@ pub async fn Prompt::read_line_with_prompt(
       if key_bindings.delete_character.matches(info) {
         if right.pop() is Some(_) {
           self.completion_state = None
+          self.track_undo(left, right)
           self.render_line(prompt, left, right)
         }
         continue
@@ -204,27 +230,53 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // Word movement and other keys omitted for brevity in this replace, 
-      // but should be kept in a full file write.
-      // I will implement them properly below.
-
       let ch = info.key_char
       if !ch.is_control() {
         left.push(ch)
         if self.completion_state is Some(state) {
           update_completion_filter(state, left)
-        } else if ch == '.' { // Example of implicit trigger
+        } else if ch == '.' {
           let raw_line = line_from_buffers(left, right)
           let items = (self.configuration.completer)(raw_line, left.length())
           if items.length() > 0 {
             self.completion_state = Some(CompletionState::new(items, ""))
           }
         }
+        self.track_undo(left, right)
         self.render_line(prompt, left, right)
       }
     }
   }
   cancel_result()
+}
+
+///|
+fn Prompt::track_undo(
+  self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+) -> Unit {
+  self.undo_manager.track(line_from_buffers(left, right), left.length())
+}
+
+///|
+fn Prompt::apply_undo_record(
+  _self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+  record : UndoRecord,
+) -> Unit {
+  left.clear()
+  right.clear()
+  let chars = record.text.to_array()
+  for i in 0..<record.cursor_pos {
+    if i < chars.length() {
+      left.push(chars[i])
+    }
+  }
+  for i in chars.length()>..record.cursor_pos {
+    right.push(chars[i])
+  }
 }
 
 ///|
@@ -238,7 +290,10 @@ fn update_completion_filter(
 
 ///|
 fn is_word_character(ch : Char) -> Bool {
-  ch.is_ascii_alphabetic() || ch.is_ascii_digit() || ch == '_'
+  (ch >= 'a' && ch <= 'z') ||
+  (ch >= 'A' && ch <= 'Z') ||
+  (ch >= '0' && ch <= '9') ||
+  ch == '_'
 }
 
 ///|

@@ -156,8 +156,10 @@ pub struct KeyBindings {
   delete_word : KeyPressPatterns
   trigger_completion : KeyPressPatterns
   dismiss_completion : KeyPressPatterns
+  undo : KeyPressPatterns
+  redo : KeyPressPatterns
 }
-pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns) -> Self
+pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns) -> Self
 
 pub struct KeyPress {
   console_key_info : @console.ConsoleKeyInfo
@@ -191,6 +193,7 @@ pub struct Prompt {
   cancel_controller : CancelController
   mut completion_state : CompletionState?
   mut last_screen : Screen?
+  undo_manager : UndoManager
 }
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
@@ -234,6 +237,18 @@ pub impl ClipboardPort for SystemClipboardPort
 type SystemConsolePort
 pub fn SystemConsolePort::new() -> Self
 pub impl ConsolePort for SystemConsolePort
+
+type UndoManager
+pub fn UndoManager::new(String, Int) -> Self
+pub fn UndoManager::redo(Self) -> UndoRecord?
+pub fn UndoManager::track(Self, String, Int) -> Unit
+pub fn UndoManager::undo(Self) -> UndoRecord?
+
+pub struct UndoRecord {
+  text : String
+  cursor_pos : Int
+}
+pub fn UndoRecord::new(String, Int) -> Self
 
 // Type aliases
 
