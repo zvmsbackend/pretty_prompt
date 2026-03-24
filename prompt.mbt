@@ -461,12 +461,13 @@ async fn Prompt::render_line(
   right : Array[Char],
 ) -> Unit {
   let width = self.console.get_buffer_width()
+  let max_items = self.configuration.max_completion_items_count
   let completion_items_count = match self.completion_state {
     Some(state) =>
-      if state.items.length() < 5 {
+      if state.items.length() < max_items {
         state.items.length()
       } else {
-        5
+        max_items
       }
     None => 0
   }
@@ -475,7 +476,11 @@ async fn Prompt::render_line(
 
   // 1. Draw main line
   let raw_line = line_from_buffers(left, right)
-  let spans = (self.configuration.highlighter)(raw_line)
+  let spans = if self.configuration.use_colors {
+    (self.configuration.highlighter)(raw_line)
+  } else {
+    []
+  }
   new_screen.draw_string(0, 0, prompt, ConsoleFormat::default())
   let prompt_width = get_string_width(prompt)
 
@@ -484,26 +489,27 @@ async fn Prompt::render_line(
   sorted_spans.sort_by_key(span => span.start)
   let chars = raw_line.to_array()
 
-  // Combine syntax highlighting spans with selection background
   for i in 0..<chars.length() {
     let mut format = ConsoleFormat::default()
-    // Find if current char has syntax highlight
-    for span in sorted_spans {
-      if i >= span.start && i < span.start + span.length {
-        format = span.format
-        break
-      }
-    }
-    // Apply selection background if needed
-    match self.selection {
-      Some(sel) =>
-        if sel.contains(i) {
-          format = {
-            ..format,
-            background: self.configuration.selection_background,
-          }
+    if self.configuration.use_colors {
+      // Find if current char has syntax highlight
+      for span in sorted_spans {
+        if i >= span.start && i < span.start + span.length {
+          format = span.format
+          break
         }
-      None => ()
+      }
+      // Apply selection background if needed
+      match self.selection {
+        Some(sel) =>
+          if sel.contains(i) {
+            format = {
+              ..format,
+              background: self.configuration.selection_background,
+            }
+          }
+        None => ()
+      }
     }
     new_screen.draw_string(0, current_col, chars[i].to_string(), format)
     current_col = current_col + get_char_width(chars[i])
@@ -526,21 +532,14 @@ async fn Prompt::render_line(
       }
       let item = state.items[item_index]
       let row = 1 + i
-      if item_index == state.selected_index {
-        new_screen.draw_string(
-          row,
-          0,
-          "> \{item.display_text}",
-          ConsoleFormat::new(bold=true, underline=true),
-        )
+      let format = if item_index == state.selected_index &&
+        self.configuration.use_colors {
+        ConsoleFormat::new(bold=true, underline=true)
       } else {
-        new_screen.draw_string(
-          row,
-          2,
-          item.display_text,
-          ConsoleFormat::default(),
-        )
+        ConsoleFormat::default()
       }
+      let prefix = if item_index == state.selected_index { "> " } else { "  " }
+      new_screen.draw_string(row, 0, prefix + item.display_text, format)
     }
   }
 

@@ -198,12 +198,16 @@ fn default_redo_patterns() -> KeyPressPatterns {
 
 ///|
 fn default_move_left_selection_patterns() -> KeyPressPatterns {
-  @console.LeftArrow |> KeyPressPattern::new(shift=true) |> KeyPressPatterns::single
+  @console.LeftArrow
+  |> KeyPressPattern::new(shift=true)
+  |> KeyPressPatterns::single
 }
 
 ///|
 fn default_move_right_selection_patterns() -> KeyPressPatterns {
-  @console.RightArrow |> KeyPressPattern::new(shift=true) |> KeyPressPatterns::single
+  @console.RightArrow
+  |> KeyPressPattern::new(shift=true)
+  |> KeyPressPatterns::single
 }
 
 ///|
@@ -294,6 +298,8 @@ pub struct PromptConfiguration {
   highlighter : async (String) -> Array[FormatSpan]
   completer : async (String, Int) -> Array[CompletionItem]
   selection_background : AnsiColor
+  use_colors : Bool
+  max_completion_items_count : Int
 }
 
 ///|
@@ -304,6 +310,8 @@ pub fn PromptConfiguration::new(
   highlighter? : async (String) -> Array[FormatSpan] = _ => [],
   completer? : async (String, Int) -> Array[CompletionItem] = (_, _) => [],
   selection_background? : AnsiColor = Blue,
+  use_colors? : Bool = true,
+  max_completion_items_count? : Int = 5,
 ) -> PromptConfiguration {
   {
     prompt,
@@ -312,10 +320,12 @@ pub fn PromptConfiguration::new(
     highlighter,
     completer,
     selection_background,
+    use_colors,
+    max_completion_items_count,
   }
 }
 
 ///|
-pub fn PromptConfiguration::default() -> PromptConfiguration {
+pub impl Default for PromptConfiguration with default() {
   PromptConfiguration::new()
 }

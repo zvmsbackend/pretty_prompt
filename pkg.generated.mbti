@@ -69,9 +69,9 @@ pub struct Cell {
   char : Char
   format : ConsoleFormat
 }
-pub fn Cell::default() -> Self
 pub fn Cell::new(Char, ConsoleFormat) -> Self
 pub fn Cell::op_equal(Self, Self) -> Bool
+pub impl Default for Cell
 pub impl Eq for Cell
 
 pub struct CompletionItem {
@@ -98,8 +98,8 @@ pub struct ConsoleFormat {
   italic : Bool
   underline : Bool
 }
-pub fn ConsoleFormat::default() -> Self
 pub fn ConsoleFormat::new(foreground? : AnsiColor, background? : AnsiColor, bold? : Bool, italic? : Bool, underline? : Bool) -> Self
+pub impl Default for ConsoleFormat
 pub impl Eq for ConsoleFormat
 
 pub(all) enum ControlCMode {
@@ -120,8 +120,8 @@ pub struct HistoryConfiguration {
   persistent_history_filepath : String?
   max_entries : Int
 }
-pub fn HistoryConfiguration::default() -> Self
 pub fn HistoryConfiguration::new(persistent_history_filepath? : String, max_entries? : Int) -> Self
+pub impl Default for HistoryConfiguration
 
 pub struct HistoryLog {
   entries : Array[String]
@@ -215,9 +215,11 @@ pub struct PromptConfiguration {
   highlighter : async (String) -> Array[FormatSpan]
   completer : async (String, Int) -> Array[CompletionItem]
   selection_background : AnsiColor
+  use_colors : Bool
+  max_completion_items_count : Int
 }
-pub fn PromptConfiguration::default() -> Self
-pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], selection_background? : AnsiColor) -> Self
+pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], selection_background? : AnsiColor, use_colors? : Bool, max_completion_items_count? : Int) -> Self
+pub impl Default for PromptConfiguration
 
 pub struct PromptResult {
   is_success : Bool

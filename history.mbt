@@ -14,7 +14,7 @@ pub fn HistoryConfiguration::new(
 }
 
 ///|
-pub fn HistoryConfiguration::default() -> HistoryConfiguration {
+pub impl Default for HistoryConfiguration with default() {
   HistoryConfiguration::new()
 }
 

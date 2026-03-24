@@ -31,7 +31,7 @@ pub struct ConsoleFormat {
 } derive(Eq)
 
 ///|
-pub fn ConsoleFormat::default() -> ConsoleFormat {
+pub impl Default for ConsoleFormat with default() {
   {
     foreground: Default,
     background: Default,

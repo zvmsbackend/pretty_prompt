@@ -11,7 +11,7 @@ pub fn Cell::new(char : Char, format : ConsoleFormat) -> Cell {
 }
 
 ///|
-pub fn Cell::default() -> Cell {
+pub impl Default for Cell with default() -> Cell {
   { char: ' ', format: ConsoleFormat::default() }
 }
 
