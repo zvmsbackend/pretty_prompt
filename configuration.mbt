@@ -332,7 +332,7 @@ impl Default for KeyBindings with default() {
 
 ///|
 pub struct PromptConfiguration {
-  prompt : String
+  prompt : FormattedString
   key_bindings : KeyBindings
   history : HistoryConfiguration
   highlighter : async (String) -> Array[FormatSpan]
@@ -346,7 +346,7 @@ pub struct PromptConfiguration {
 
 ///|
 pub fn PromptConfiguration::new(
-  prompt? : String = "> ",
+  prompt? : FormattedString = FormattedString::new("> "),
   key_bindings? : KeyBindings = KeyBindings::default(),
   history? : HistoryConfiguration = HistoryConfiguration::default(),
   highlighter? : async (String) -> Array[FormatSpan] = _ => [],

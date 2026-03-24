@@ -47,10 +47,10 @@ pub async fn Prompt::read_line(self : Prompt) -> PromptResult {
 ///|
 pub async fn Prompt::read_line_with_prompt(
   self : Prompt,
-  prompt : String,
+  prompt : FormattedString,
 ) -> PromptResult {
   self.cancel_controller.set_mode(CaptureAsInput)
-  self.console.write(prompt)
+  self.console.write(prompt.text)
   let left : Array[Char] = []
   let right : Array[Char] = []
   let key_bindings = self.configuration.key_bindings
@@ -596,26 +596,29 @@ fn line_from_buffers(left : Array[Char], right : Array[Char]) -> String {
 ///|
 async fn Prompt::render_line(
   self : Prompt,
-  prompt : String,
+  prompt : FormattedString,
   left : Array[Char],
   right : Array[Char],
 ) -> Unit {
   let width = self.console.get_buffer_width()
   let max_items = self.configuration.max_completion_items_count
 
-  // 1. Determine Prompt Text
+  // 1. Determine Prompt Text & Style
   let active_prompt = match self.search_state {
-    Some(s) => "(reverse-i-search)'\{s.query}': "
+    Some(s) =>
+      FormattedString::new("(reverse-i-search)'\{s.query}': ", spans=[
+        FormatSpan::new(0, 18, ConsoleFormat::new(bold=true, foreground=Cyan)),
+      ])
     None => prompt
   }
-  let active_prompt_width = get_string_width(active_prompt)
+  let active_prompt_width = active_prompt.width()
 
   // 2. Word Wrapping
   let raw_line = line_from_buffers(left, right)
-  let full_text = prompt + raw_line
+  let full_text = active_prompt.text + raw_line
   let wrapped = wrap_text(
     full_text,
-    get_string_width(prompt) + get_chars_width(left.iter()),
+    active_prompt_width + get_chars_width(left.iter()),
     width,
   )
 
@@ -651,34 +654,47 @@ async fn Prompt::render_line(
   }
   let sorted_spans = spans.copy()
   sorted_spans.sort_by_key(span => span.start)
-  new_screen.draw_string(0, 0, active_prompt, ConsoleFormat::default())
+
+  let active_prompt_spans = active_prompt.spans.copy()
+  active_prompt_spans.sort_by_key(span => span.start)
+
   let mut current_text_pos = 0
   for r in 0..<wrapped.lines.length() {
     let line_text = wrapped.lines[r]
-    let mut line_col = if r == 0 { active_prompt_width } else { 0 }
+    let mut line_col = 0
+
     for ch in line_text {
-      if r == 0 && line_col < active_prompt_width {
-        line_col = line_col + get_char_width(ch)
-        continue
-      }
-      let i = current_text_pos
       let mut format = ConsoleFormat::default()
       if self.configuration.use_colors {
-        for span in sorted_spans {
-          if i >= span.start && i < span.start + span.length {
-            format = span.format
-            break
+        if current_text_pos < active_prompt_width {
+          // Apply prompt styles
+          for span in active_prompt_spans {
+            if current_text_pos >= span.start &&
+              current_text_pos < span.start + span.length {
+              format = span.format
+              break
+            }
           }
-        }
-        if self.selection is Some(sel) {
-          if sel.contains(i) {
-            format = {
-              ..format,
-              background: self.configuration.selection_background,
+        } else {
+          // Apply input text styles
+          let i = current_text_pos - active_prompt_width
+          for span in sorted_spans {
+            if i >= span.start && i < span.start + span.length {
+              format = span.format
+              break
+            }
+          }
+          if self.selection is Some(sel) {
+            if sel.contains(i) {
+              format = {
+                ..format,
+                background: self.configuration.selection_background,
+              }
             }
           }
         }
       }
+
       new_screen.rows[r][line_col] = Cell::new(ch, format)
       let w = get_char_width(ch)
       if w == 2 && line_col + 1 < width {

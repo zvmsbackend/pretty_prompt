@@ -28,9 +28,7 @@ pub suberror ClipboardPortError {
   NotAvailable
   PermissionDenied
   BackendFailure(String)
-}
-pub impl Eq for ClipboardPortError
-pub impl Show for ClipboardPortError
+} derive(Eq, Show)
 
 // Types and methods
 pub(all) enum AnsiColor {
@@ -53,8 +51,7 @@ pub(all) enum AnsiColor {
   BrightWhite
   Color256(Int)
   Rgb(Int, Int, Int)
-}
-pub impl Eq for AnsiColor
+} derive(Eq)
 
 pub struct CancelController {
   console : &ConsolePort
@@ -70,11 +67,10 @@ pub fn CancelController::take_cancellation_requested(Self) -> Bool
 pub struct Cell {
   char : Char
   format : ConsoleFormat
-}
+} derive(Eq)
 pub fn Cell::new(Char, ConsoleFormat) -> Self
 pub fn Cell::op_equal(Self, Self) -> Bool
 pub impl Default for Cell
-pub impl Eq for Cell
 
 pub struct CompletionItem {
   replacement_text : String
@@ -100,17 +96,14 @@ pub struct ConsoleFormat {
   bold : Bool
   italic : Bool
   underline : Bool
-}
+} derive(Eq)
 pub fn ConsoleFormat::new(foreground? : AnsiColor, background? : AnsiColor, bold? : Bool, italic? : Bool, underline? : Bool) -> Self
 pub impl Default for ConsoleFormat
-pub impl Eq for ConsoleFormat
 
 pub(all) enum ControlCMode {
   CaptureAsInput
   AllowCancelSignal
-}
-pub impl Eq for ControlCMode
-pub impl Show for ControlCMode
+} derive(Eq, Show)
 
 pub struct FormatSpan {
   start : Int
@@ -118,6 +111,13 @@ pub struct FormatSpan {
   format : ConsoleFormat
 }
 pub fn FormatSpan::new(Int, Int, ConsoleFormat) -> Self
+
+pub struct FormattedString {
+  text : String
+  spans : Array[FormatSpan]
+}
+pub fn FormattedString::new(String, spans? : Array[FormatSpan]) -> Self
+pub fn FormattedString::width(Self) -> Int
 
 pub struct HistoryConfiguration {
   persistent_history_filepath : String?
@@ -246,11 +246,11 @@ pub struct Prompt {
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
 pub async fn Prompt::read_line(Self) -> PromptResult
-pub async fn Prompt::read_line_with_prompt(Self, String) -> PromptResult
+pub async fn Prompt::read_line_with_prompt(Self, FormattedString) -> PromptResult
 pub fn Prompt::take_execution_cancellation_requested(Self) -> Bool
 
 pub struct PromptConfiguration {
-  prompt : String
+  prompt : FormattedString
   key_bindings : KeyBindings
   history : HistoryConfiguration
   highlighter : async (String) -> Array[FormatSpan]
@@ -262,7 +262,7 @@ pub struct PromptConfiguration {
   kill_ring_max_size : Int
 }
 pub fn PromptConfiguration::default() -> Self
-pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], overload_provider? : async (String, Int) -> Array[OverloadItem], selection_background? : AnsiColor, use_colors? : Bool, max_completion_items_count? : Int, kill_ring_max_size? : Int) -> Self
+pub fn PromptConfiguration::new(prompt? : FormattedString, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], overload_provider? : async (String, Int) -> Array[OverloadItem], selection_background? : AnsiColor, use_colors? : Bool, max_completion_items_count? : Int, kill_ring_max_size? : Int) -> Self
 
 pub struct PromptResult {
   is_success : Bool

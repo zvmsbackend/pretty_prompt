@@ -444,7 +444,7 @@ async test "prompt read_line submits typed text" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line_with_prompt("> ")
+  let result = prompt.read_line_with_prompt(FormattedString::new("> "))
   assert_true(result.is_success)
   assert_eq(result.text, "hi")
   assert_eq(result.submit_key_info.key, @console.Enter)
@@ -466,7 +466,7 @@ async test "prompt read_line handles backspace" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line_with_prompt("# ")
+  let result = prompt.read_line_with_prompt(FormattedString::new("# "))
   assert_true(result.is_success)
   assert_eq(result.text, "a")
 
@@ -485,7 +485,7 @@ async test "prompt read_line inserts in middle with arrows" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line_with_prompt("> ")
+  let result = prompt.read_line_with_prompt(FormattedString::new("> "))
   assert_true(result.is_success)
   assert_eq(result.text, "abc")
 
@@ -506,7 +506,7 @@ async test "prompt read_line supports delete key" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line_with_prompt("> ")
+  let result = prompt.read_line_with_prompt(FormattedString::new("> "))
   assert_true(result.is_success)
   assert_eq(result.text, "ac")
 
@@ -527,7 +527,7 @@ async test "prompt read_line supports home and end" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line_with_prompt("> ")
+  let result = prompt.read_line_with_prompt(FormattedString::new("> "))
   assert_true(result.is_success)
   assert_eq(result.text, "abcd")
 
@@ -540,7 +540,7 @@ async test "prompt read_line returns cancelled on ctrl c" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line_with_prompt("$ ")
+  let result = prompt.read_line_with_prompt(FormattedString::new("$ "))
   assert_false(result.is_success)
   assert_eq(result.text, "")
   assert_eq(result.submit_key_info.key, @console.C)
@@ -557,7 +557,9 @@ async test "prompt read_line uses configured default prompt" {
     key('\n', @console.Enter),
   ])
   let clipboard = FakeClipboard::new("")
-  let configuration = @pretty_prompt.PromptConfiguration::new(prompt="pp> ")
+  let configuration = @pretty_prompt.PromptConfiguration::new(
+    prompt=FormattedString::new("pp> "),
+  )
   let prompt = @pretty_prompt.Prompt::new(console, clipboard, configuration~)
 
   let result = prompt.read_line()
@@ -607,11 +609,11 @@ async test "prompt history recalls previous entry" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let first = prompt.read_line_with_prompt("> ")
+  let first = prompt.read_line_with_prompt(FormattedString::new("> "))
   assert_true(first.is_success)
   assert_eq(first.text, "first")
 
-  let second = prompt.read_line_with_prompt("> ")
+  let second = prompt.read_line_with_prompt(FormattedString::new("> "))
   assert_true(second.is_success)
   assert_eq(second.text, "first")
 
