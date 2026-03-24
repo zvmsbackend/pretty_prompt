@@ -1,0 +1,14 @@
+{
+  "name": "sennenki/pretty_prompt",
+  "version": "0.1.0",
+  "deps": {
+    "sennenki/clipboard": "0.1.0",
+    "sennenki/console": "0.1.0"
+  },
+  "readme": "README.mbt.md",
+  "repository": "",
+  "license": "Apache-2.0",
+  "keywords": [],
+  "description": "",
+  "preferred-target": "native"
+}
