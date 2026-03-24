@@ -199,19 +199,21 @@ pub fn get_char_width(ch : Char) -> Int {
   match ucs {
     0x26AA | 0x26AB | 0x2B55 | 0x26A1 | 0x2B1B | 0x2B1C | 0x274C | 0x2705 => 2
     _ =>
-      if (ucs >= 0x1100 &&
-        (ucs <= 0x115F ||
-        ucs == 0x2329 ||
-        ucs == 0x232A ||
-        (ucs >= 0x2E80 && ucs <= 0xA4CF && ucs != 0x303F) ||
-        (ucs >= 0xAC00 && ucs <= 0xD7A3) ||
-        (ucs >= 0xF900 && ucs <= 0xFAFF) ||
-        (ucs >= 0xFE10 && ucs <= 0xFE19) ||
-        (ucs >= 0xFE30 && ucs <= 0xFE6F) ||
-        (ucs >= 0xFF00 && ucs <= 0xFF60) ||
-        (ucs >= 0xFFE0 && ucs <= 0xFFE6) ||
-        (ucs >= 0x20000 && ucs <= 0x2FFFD) ||
-        (ucs >= 0x30000 && ucs <= 0x3FFFD))) {
+      if ucs >= 0x1100 &&
+        (
+          ucs <= 0x115F ||
+          ucs == 0x2329 ||
+          ucs == 0x232A ||
+          (ucs >= 0x2E80 && ucs <= 0xA4CF && ucs != 0x303F) ||
+          (ucs >= 0xAC00 && ucs <= 0xD7A3) ||
+          (ucs >= 0xF900 && ucs <= 0xFAFF) ||
+          (ucs >= 0xFE10 && ucs <= 0xFE19) ||
+          (ucs >= 0xFE30 && ucs <= 0xFE6F) ||
+          (ucs >= 0xFF00 && ucs <= 0xFF60) ||
+          (ucs >= 0xFFE0 && ucs <= 0xFFE6) ||
+          (ucs >= 0x20000 && ucs <= 0x2FFFD) ||
+          (ucs >= 0x30000 && ucs <= 0x3FFFD)
+        ) {
         2
       } else {
         1
@@ -228,6 +230,30 @@ pub fn get_chars_width(chars : Iter[Char]) -> Int {
   }
 }
 
+///|
 pub fn get_string_width(s : String) -> Int {
   get_chars_width(s.iter())
+}
+
+///|
+pub fn is_word_boundary(c1 : Char?, c2 : Char?) -> Bool {
+  match (c1, c2) {
+    (Some(c1), Some(c2)) => {
+      let is_whitespace1 = c1.is_whitespace()
+      let is_whitespace2 = c2.is_whitespace()
+      if is_whitespace1 && !is_whitespace2 {
+        true
+      } else if is_whitespace1 || is_whitespace2 {
+        false
+      } else {
+        is_alphanumeric(c1) != is_alphanumeric(c2)
+      }
+    }
+    _ => false
+  }
+}
+
+///|
+fn is_alphanumeric(ch : Char) -> Bool {
+  ch.is_ascii_alphabetic() || ch.is_ascii_digit()
 }

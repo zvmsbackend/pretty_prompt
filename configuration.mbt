@@ -74,6 +74,10 @@ pub struct KeyBindings {
   move_right : KeyPressPatterns
   move_home : KeyPressPatterns
   move_end : KeyPressPatterns
+  move_word_left : KeyPressPatterns
+  move_word_right : KeyPressPatterns
+  backward_delete_word : KeyPressPatterns
+  delete_word : KeyPressPatterns
 }
 
 ///|
@@ -131,6 +135,38 @@ fn default_move_end_patterns() -> KeyPressPatterns {
 }
 
 ///|
+fn default_move_word_left_patterns() -> KeyPressPatterns {
+  KeyPressPatterns::new([
+    KeyPressPattern::new(LeftArrow, control=true),
+    KeyPressPattern::new(B, alt=true),
+  ])
+}
+
+///|
+fn default_move_word_right_patterns() -> KeyPressPatterns {
+  KeyPressPatterns::new([
+    KeyPressPattern::new(RightArrow, control=true),
+    KeyPressPattern::new(F, alt=true),
+  ])
+}
+
+///|
+fn default_backward_delete_word_patterns() -> KeyPressPatterns {
+  KeyPressPatterns::new([
+    KeyPressPattern::new(W, control=true),
+    KeyPressPattern::new(Backspace, alt=true),
+  ])
+}
+
+///|
+fn default_delete_word_patterns() -> KeyPressPatterns {
+  KeyPressPatterns::new([
+    KeyPressPattern::new(D, alt=true),
+    KeyPressPattern::new(Delete, control=true),
+  ])
+}
+
+///|
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns(),
   cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns(),
@@ -142,6 +178,10 @@ pub fn KeyBindings::new(
   move_right? : KeyPressPatterns = default_move_right_patterns(),
   move_home? : KeyPressPatterns = default_move_home_patterns(),
   move_end? : KeyPressPatterns = default_move_end_patterns(),
+  move_word_left? : KeyPressPatterns = default_move_word_left_patterns(),
+  move_word_right? : KeyPressPatterns = default_move_word_right_patterns(),
+  backward_delete_word? : KeyPressPatterns = default_backward_delete_word_patterns(),
+  delete_word? : KeyPressPatterns = default_delete_word_patterns(),
 ) -> KeyBindings {
   {
     submit_prompt,
@@ -154,6 +194,10 @@ pub fn KeyBindings::new(
     move_right,
     move_home,
     move_end,
+    move_word_left,
+    move_word_right,
+    backward_delete_word,
+    delete_word,
   }
 }
 

@@ -7,6 +7,14 @@ import {
 }
 
 // Values
+pub fn get_char_width(Char) -> Int
+
+pub fn get_chars_width(Iter[Char]) -> Int
+
+pub fn get_string_width(String) -> Int
+
+pub fn is_word_boundary(Char?, Char?) -> Bool
+
 pub fn read_key_presses(&ConsolePort) -> Array[KeyPress]
 
 // Errors
@@ -71,8 +79,12 @@ pub struct KeyBindings {
   move_right : KeyPressPatterns
   move_home : KeyPressPatterns
   move_end : KeyPressPatterns
+  move_word_left : KeyPressPatterns
+  move_word_right : KeyPressPatterns
+  backward_delete_word : KeyPressPatterns
+  delete_word : KeyPressPatterns
 }
-pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns) -> Self
+pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns) -> Self
 
 pub struct KeyPress {
   console_key_info : @console.ConsoleKeyInfo

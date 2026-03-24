@@ -116,6 +116,100 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
+      if key_bindings.move_word_left.matches(info) {
+        let mut changed = false
+        while left.length() > 0 {
+          let i = left.length() - 1
+          let ch = left[i]
+          let next_ch = if right.length() > 0 {
+            Some(right[right.length() - 1])
+          } else {
+            None
+          }
+          if changed && is_word_boundary(Some(ch), next_ch) {
+            break
+          }
+          if left.pop() is Some(c) {
+            right.push(c)
+            changed = true
+          }
+        }
+        if changed {
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      if key_bindings.move_word_right.matches(info) {
+        let mut changed = false
+        while right.length() > 0 {
+          let i = right.length() - 1
+          let ch = right[i]
+          let prev_ch = if left.length() > 0 {
+            Some(left[left.length() - 1])
+          } else {
+            None
+          }
+          if changed && is_word_boundary(prev_ch, Some(ch)) {
+            break
+          }
+          if right.pop() is Some(c) {
+            left.push(c)
+            changed = true
+          }
+        }
+        if changed {
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      if key_bindings.backward_delete_word.matches(info) {
+        let mut changed = false
+        while left.length() > 0 {
+          let i = left.length() - 1
+          let ch = left[i]
+          let next_ch = if right.length() > 0 {
+            Some(right[right.length() - 1])
+          } else {
+            None
+          }
+          if changed && is_word_boundary(Some(ch), next_ch) {
+            break
+          }
+          if left.pop() is Some(_) {
+            changed = true
+          }
+        }
+        if changed {
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      if key_bindings.delete_word.matches(info) {
+        let mut changed = false
+        while right.length() > 0 {
+          let i = right.length() - 1
+          let ch = right[i]
+          let prev_ch = if left.length() > 0 {
+            Some(left[left.length() - 1])
+          } else {
+            None
+          }
+          if changed && is_word_boundary(prev_ch, Some(ch)) {
+            break
+          }
+          if right.pop() is Some(_) {
+            changed = true
+          }
+        }
+        if changed {
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
       if key_bindings.move_home.matches(info) {
         let mut changed = false
         while left.pop() is Some(ch) {
