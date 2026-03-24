@@ -11,6 +11,7 @@ pub struct Prompt {
   mut selection : Selection?
   mut overload_state : OverloadState?
   kill_ring : KillRing
+  mut search_state : SearchState?
 }
 
 ///|
@@ -34,6 +35,7 @@ pub async fn Prompt::new(
     selection: None,
     overload_state: None,
     kill_ring: KillRing::new(max_size=configuration.kill_ring_max_size),
+    search_state: None,
   }
 }
 
@@ -67,6 +69,7 @@ pub async fn Prompt::read_line_with_prompt(
       if key_press.pasted_text is Some(pasted) {
         self.completion_state = None
         self.overload_state = None
+        self.search_state = None
         self.delete_selection(left, right)
         left.push_iter(pasted.iter())
         self.track_undo(left, right)
@@ -75,17 +78,55 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // 1. Global keys
-      if key_bindings.cancel_prompt.matches(info) {
-        self.completion_state = None
-        self.overload_state = None
-        self.selection = None
-        self.console.write_line("")
-        self.cancel_controller.set_mode(AllowCancelSignal)
-        return PromptResult::cancelled(info)
+      // 2. Search Mode Handling
+      if self.search_state is Some(state) {
+        if key_bindings.reverse_search.matches(info) {
+          if self.history.navigate_search(state.query, state.history_index - 1)
+            is Some(res) {
+            state.history_index = res.0
+            self.set_line_buffers(left, right, res.1)
+          }
+          self.render_line(prompt, left, right)
+          continue
+        }
+        if key_bindings.dismiss_completion.matches(info) {
+          self.search_state = None
+          self.render_line(prompt, left, right)
+          continue
+        }
+        if key_bindings.submit_prompt.matches(info) {
+          self.search_state = None
+          self.render_line(prompt, left, right)
+          continue
+        }
+        if key_bindings.backward_delete_character.matches(info) {
+          if state.query.length() > 0 {
+            state.query = state.query
+              .sub(end=state.query.length() - 1)
+              .to_string()
+            if self.history.navigate_search(state.query, -1) is Some(res) {
+              state.history_index = res.0
+              self.set_line_buffers(left, right, res.1)
+            }
+          }
+          self.render_line(prompt, left, right)
+          continue
+        }
+        let ch = info.key_char
+        if !ch.is_control() {
+          state.query = state.query + ch.to_string()
+          if self.history.navigate_search(state.query, -1) is Some(res) {
+            state.history_index = res.0
+            self.set_line_buffers(left, right, res.1)
+          }
+          self.render_line(prompt, left, right)
+          continue
+        }
+        // Other keys exit search
+        self.search_state = None
       }
 
-      // 2. Handle Navigation Mode
+      // 3. Navigation Modes (Completion/Overload)
       if self.completion_state is Some(_) || self.overload_state is Some(_) {
         if key_bindings.dismiss_completion.matches(info) {
           self.completion_state = None
@@ -94,48 +135,39 @@ pub async fn Prompt::read_line_with_prompt(
           last_was_yank = false
           continue
         }
-
         if key_bindings.history_previous.matches(info) {
           match self.completion_state {
-            Some(state) =>
-              state.selected_index = (
-                  state.selected_index + state.items.length() - 1
-                ) %
-                state.items.length()
+            Some(s) =>
+              s.selected_index = (s.selected_index + s.items.length() - 1) %
+                s.items.length()
             None =>
-              if self.overload_state is Some(state) {
-                state.selected_index = (
-                    state.selected_index + state.items.length() - 1
-                  ) %
-                  state.items.length()
+              if self.overload_state is Some(s) {
+                s.selected_index = (s.selected_index + s.items.length() - 1) %
+                  s.items.length()
               }
           }
           self.render_line(prompt, left, right)
           last_was_yank = false
           continue
         }
-
         if key_bindings.history_next.matches(info) {
           match self.completion_state {
-            Some(state) =>
-              state.selected_index = (state.selected_index + 1) %
-                state.items.length()
+            Some(s) =>
+              s.selected_index = (s.selected_index + 1) % s.items.length()
             None =>
-              if self.overload_state is Some(state) {
-                state.selected_index = (state.selected_index + 1) %
-                  state.items.length()
+              if self.overload_state is Some(s) {
+                s.selected_index = (s.selected_index + 1) % s.items.length()
               }
           }
           self.render_line(prompt, left, right)
           last_was_yank = false
           continue
         }
-
-        if self.completion_state is Some(state) {
+        if self.completion_state is Some(s) {
           if key_bindings.submit_prompt.matches(info) ||
             key_bindings.trigger_completion.matches(info) {
-            if state.items.length() > 0 {
-              let item = state.items[state.selected_index]
+            if s.items.length() > 0 {
+              let item = s.items[s.selected_index]
               while left.length() > 0 &&
                     is_word_character(left[left.length() - 1]) {
                 ignore(left.pop())
@@ -155,7 +187,16 @@ pub async fn Prompt::read_line_with_prompt(
         }
       }
 
-      // 3. Selection & Clipboard
+      // 4. Ctrl+R Search Trigger
+      if key_bindings.reverse_search.matches(info) {
+        self.completion_state = None
+        self.overload_state = None
+        self.search_state = Some(SearchState::new())
+        self.render_line(prompt, left, right)
+        continue
+      }
+
+      // 5. Selection & Clipboard
       if key_bindings.copy_selection.matches(info) {
         if self.selection is Some(sel) {
           let (start, end) = sel.range()
@@ -166,7 +207,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.cut_selection.matches(info) {
         if self.selection is Some(sel) {
           let (start, end) = sel.range()
@@ -182,7 +222,7 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // 4. Kill Ring Actions
+      // 6. Kill Ring Actions
       if key_bindings.kill_line_tail.matches(info) {
         if right.length() > 0 {
           let text = String::from_array(right.rev())
@@ -194,7 +234,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.kill_line_head.matches(info) {
         if left.length() > 0 {
           let text = String::from_array(left)
@@ -206,7 +245,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.yank.matches(info) {
         if self.kill_ring.yank() is Some(text) {
           self.delete_selection(left, right)
@@ -217,7 +255,6 @@ pub async fn Prompt::read_line_with_prompt(
         }
         continue
       }
-
       if key_bindings.yank_pop.matches(info) && last_was_yank {
         if self.undo_manager.undo() is Some(record) {
           self.apply_undo_record(left, right, record)
@@ -230,7 +267,7 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // 5. Movement
+      // 7. Movement & Selection Movement
       if key_bindings.move_left_selection.matches(info) {
         self.handle_selection_movement(left, right, -1)
         self.render_line(prompt, left, right)
@@ -256,7 +293,7 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // 6. Undo/Redo
+      // 8. Undo/Redo
       if key_bindings.undo.matches(info) {
         self.completion_state = None
         self.overload_state = None
@@ -268,7 +305,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.redo.matches(info) {
         self.completion_state = None
         self.overload_state = None
@@ -281,7 +317,7 @@ pub async fn Prompt::read_line_with_prompt(
         continue
       }
 
-      // 7. Standard keys
+      // 9. Standard Keys
       if key_bindings.trigger_completion.matches(info) {
         let raw_line = line_from_buffers(left, right)
         let items = (self.configuration.completer)(raw_line, left.length())
@@ -297,7 +333,6 @@ pub async fn Prompt::read_line_with_prompt(
         }
         continue
       }
-
       if key_bindings.history_previous.matches(info) {
         self.completion_state = None
         self.selection = None
@@ -309,7 +344,6 @@ pub async fn Prompt::read_line_with_prompt(
         }
         continue
       }
-
       if key_bindings.history_next.matches(info) {
         self.completion_state = None
         self.selection = None
@@ -347,7 +381,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.delete_character.matches(info) {
         if self.selection is Some(_) {
           self.delete_selection(left, right)
@@ -359,7 +392,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.move_left.matches(info) {
         self.selection = None
         if left.pop() is Some(ch) {
@@ -369,7 +401,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.move_right.matches(info) {
         self.selection = None
         if right.pop() is Some(ch) {
@@ -379,7 +410,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.move_home.matches(info) {
         self.selection = None
         while left.pop() is Some(ch) {
@@ -389,7 +419,6 @@ pub async fn Prompt::read_line_with_prompt(
         last_was_yank = false
         continue
       }
-
       if key_bindings.move_end.matches(info) {
         self.selection = None
         while right.pop() is Some(ch) {
@@ -573,6 +602,15 @@ async fn Prompt::render_line(
 ) -> Unit {
   let width = self.console.get_buffer_width()
   let max_items = self.configuration.max_completion_items_count
+
+  // 1. Determine Prompt Text
+  let active_prompt = match self.search_state {
+    Some(s) => "(reverse-i-search)'\{s.query}': "
+    None => prompt
+  }
+  let active_prompt_width = get_string_width(active_prompt)
+
+  // 2. Word Wrapping
   let raw_line = line_from_buffers(left, right)
   let full_text = prompt + raw_line
   let wrapped = wrap_text(
@@ -605,7 +643,7 @@ async fn Prompt::render_line(
     overload_items_count
   let new_screen = Screen::new(height, width)
 
-  // 3. Draw Input Lines with Highlight & Selection
+  // 4. Draw Input Lines
   let spans = if self.configuration.use_colors {
     (self.configuration.highlighter)(raw_line)
   } else {
@@ -613,21 +651,16 @@ async fn Prompt::render_line(
   }
   let sorted_spans = spans.copy()
   sorted_spans.sort_by_key(span => span.start)
-  let prompt_width = get_string_width(prompt)
-
-  new_screen.draw_string(0, 0, prompt, ConsoleFormat::default())
-
+  new_screen.draw_string(0, 0, active_prompt, ConsoleFormat::default())
   let mut current_text_pos = 0
   for r in 0..<wrapped.lines.length() {
     let line_text = wrapped.lines[r]
-    let mut line_col = if r == 0 { prompt_width } else { 0 }
-
+    let mut line_col = if r == 0 { active_prompt_width } else { 0 }
     for ch in line_text {
-      if r == 0 && line_col < prompt_width {
+      if r == 0 && line_col < active_prompt_width {
         line_col = line_col + get_char_width(ch)
         continue
       }
-
       let i = current_text_pos
       let mut format = ConsoleFormat::default()
       if self.configuration.use_colors {
@@ -655,11 +688,10 @@ async fn Prompt::render_line(
       current_text_pos = current_text_pos + 1
     }
   }
-
   new_screen.cursor_row = wrapped.cursor_row
   new_screen.cursor_col = wrapped.cursor_col
 
-  // 4. Draw Overloads & Completions
+  // 5. Draw Overloads & Completions
   let mut next_row = wrapped.lines.length()
   if self.overload_state is Some(state) {
     for i in 0..<overload_items_count {
@@ -673,7 +705,6 @@ async fn Prompt::render_line(
       next_row = next_row + 1
     }
   }
-
   if self.completion_state is Some(state) {
     let start = if state.selected_index < 2 {
       0
@@ -686,7 +717,6 @@ async fn Prompt::render_line(
         break
       }
       let item = state.items[item_index]
-      let row = next_row + i
       let is_selected = item_index == state.selected_index
       let format = if is_selected && self.configuration.use_colors {
         ConsoleFormat::new(bold=true, underline=true)
@@ -694,10 +724,15 @@ async fn Prompt::render_line(
         ConsoleFormat::default()
       }
       let prefix = if is_selected { "> " } else { "  " }
-      new_screen.draw_string(row, 0, prefix + item.display_text, format)
+      new_screen.draw_string(
+        next_row + i,
+        0,
+        prefix + item.display_text,
+        format,
+      )
       if is_selected && item.description != "" {
         new_screen.draw_string(
-          row,
+          next_row + i,
           30,
           " │ " + item.description,
           ConsoleFormat::default(),
@@ -706,7 +741,7 @@ async fn Prompt::render_line(
     }
   }
 
-  // 5. Render Diff
+  // 6. Render Diff
   let base_row = self.console.get_cursor_top()
   let old_screen_val = self.last_screen.unwrap_or_else(() => {
     Screen::new(height, width)

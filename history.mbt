@@ -150,6 +150,32 @@ pub fn HistoryLog::entry_count(self : HistoryLog) -> Int {
 }
 
 ///|
+/// 在历史记录中搜索匹配项
+pub fn HistoryLog::navigate_search(
+  self : HistoryLog,
+  query : String,
+  start_index : Int,
+) -> (Int, String)? {
+  if self.entries.length() == 0 {
+    return None
+  }
+  let start = if start_index < 0 {
+    self.entries.length() - 1
+  } else if start_index >= self.entries.length() {
+    self.entries.length() - 1
+  } else {
+    start_index
+  }
+  for i in start>=..0 {
+    let entry = self.entries[i]
+    if matches_history_pattern(entry, query) {
+      return Some((i, entry))
+    }
+  }
+  None
+}
+
+///|
 fn trim_entries(entries : Array[String], max_entries : Int) -> Unit {
   while entries.length() > max_entries {
     ignore(entries.remove(0))

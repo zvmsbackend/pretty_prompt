@@ -137,6 +137,7 @@ pub fn HistoryLog::entry_count(Self) -> Int
 pub async fn HistoryLog::load_persistent_history(Self) -> Unit
 pub fn HistoryLog::navigate_next(Self) -> String?
 pub fn HistoryLog::navigate_previous(Self, String) -> String?
+pub fn HistoryLog::navigate_search(Self, String, Int) -> (Int, String)?
 pub fn HistoryLog::new(HistoryConfiguration) -> Self
 pub fn HistoryLog::reset_navigation(Self) -> Unit
 pub async fn HistoryLog::save_persistent_history_full(Self) -> Unit
@@ -171,8 +172,9 @@ pub struct KeyBindings {
   kill_line_head : KeyPressPatterns
   yank : KeyPressPatterns
   yank_pop : KeyPressPatterns
+  reverse_search : KeyPressPatterns
 }
-pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns, move_left_selection? : KeyPressPatterns, move_right_selection? : KeyPressPatterns, move_home_selection? : KeyPressPatterns, move_end_selection? : KeyPressPatterns, copy_selection? : KeyPressPatterns, cut_selection? : KeyPressPatterns, kill_line_tail? : KeyPressPatterns, kill_line_head? : KeyPressPatterns, yank? : KeyPressPatterns, yank_pop? : KeyPressPatterns) -> Self
+pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns, move_left_selection? : KeyPressPatterns, move_right_selection? : KeyPressPatterns, move_home_selection? : KeyPressPatterns, move_end_selection? : KeyPressPatterns, copy_selection? : KeyPressPatterns, cut_selection? : KeyPressPatterns, kill_line_tail? : KeyPressPatterns, kill_line_head? : KeyPressPatterns, yank? : KeyPressPatterns, yank_pop? : KeyPressPatterns, reverse_search? : KeyPressPatterns) -> Self
 
 pub struct KeyPress {
   console_key_info : @console.ConsoleKeyInfo
@@ -239,6 +241,7 @@ pub struct Prompt {
   mut selection : Selection?
   mut overload_state : OverloadState?
   kill_ring : KillRing
+  mut search_state : SearchState?
 }
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
@@ -278,6 +281,12 @@ pub struct Screen {
 }
 pub fn Screen::draw_string(Self, Int, Int, String, ConsoleFormat) -> Unit
 pub fn Screen::new(Int, Int) -> Self
+
+pub struct SearchState {
+  mut query : String
+  mut history_index : Int
+}
+pub fn SearchState::new() -> Self
 
 pub struct Selection {
   anchor : Int

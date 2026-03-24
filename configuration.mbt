@@ -92,6 +92,7 @@ pub struct KeyBindings {
   kill_line_head : KeyPressPatterns
   yank : KeyPressPatterns
   yank_pop : KeyPressPatterns
+  reverse_search : KeyPressPatterns
 }
 
 ///|
@@ -255,6 +256,11 @@ fn default_yank_pop_patterns() -> KeyPressPatterns {
 }
 
 ///|
+fn default_reverse_search_patterns() -> KeyPressPatterns {
+  @console.R |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
+}
+
+///|
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns(),
   cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns(),
@@ -284,6 +290,7 @@ pub fn KeyBindings::new(
   kill_line_head? : KeyPressPatterns = default_kill_line_head_patterns(),
   yank? : KeyPressPatterns = default_yank_patterns(),
   yank_pop? : KeyPressPatterns = default_yank_pop_patterns(),
+  reverse_search? : KeyPressPatterns = default_reverse_search_patterns(),
 ) -> KeyBindings {
   {
     submit_prompt,
@@ -314,6 +321,7 @@ pub fn KeyBindings::new(
     kill_line_head,
     yank,
     yank_pop,
+    reverse_search,
   }
 }
 
