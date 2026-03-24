@@ -2,6 +2,7 @@
 pub struct Prompt {
   console : &ConsolePort
   clipboard : &ClipboardPort
+  configuration : PromptConfiguration
   cancel_controller : CancelController
 }
 
@@ -9,19 +10,27 @@ pub struct Prompt {
 pub fn Prompt::new(
   console : &ConsolePort,
   clipboard : &ClipboardPort,
+  configuration? : PromptConfiguration = PromptConfiguration::default(),
 ) -> Prompt {
   let cancel_controller = CancelController::new(console)
-  { console, clipboard, cancel_controller }
+  { console, clipboard, configuration, cancel_controller }
 }
 
 ///|
-pub fn Prompt::read_line(
+pub fn Prompt::read_line(self : Prompt) -> PromptResult {
+  self.read_line_with_prompt(self.configuration.prompt)
+}
+
+///|
+pub fn Prompt::read_line_with_prompt(
   self : Prompt,
-  prompt? : String = "> ",
+  prompt : String,
 ) -> PromptResult {
   self.cancel_controller.set_mode(CaptureAsInput)
   self.console.write(prompt)
   let left : Array[Char] = []
+  let right : Array[Char] = []
+  let key_bindings = self.configuration.key_bindings
 
   while true {
     if self.cancel_controller.take_cancellation_requested() {
@@ -33,34 +42,84 @@ pub fn Prompt::read_line(
     for key_press in key_presses {
       if key_press.pasted_text is Some(pasted) {
         append_text(left, pasted)
-        self.console.write(pasted)
+        render_line(self.console, prompt, left, right)
         continue
       }
 
       let info = key_press.console_key_info
-      if info.control && info.key is @console.C {
+      if key_bindings.cancel_prompt.matches(info) {
         self.console.write_line("")
         self.cancel_controller.set_mode(AllowCancelSignal)
         return PromptResult::cancelled(info)
       }
 
-      match info.key {
-        Enter => {
-          self.console.write_line("")
-          self.cancel_controller.set_mode(AllowCancelSignal)
-          return PromptResult::submitted(String::from_array(left), info)
+      if key_bindings.submit_prompt.matches(info) {
+        self.console.write("\r")
+        self.console.write(prompt)
+        self.console.write(line_from_buffers(left, right))
+        self.console.write_line("")
+        self.cancel_controller.set_mode(AllowCancelSignal)
+        return PromptResult::submitted(line_from_buffers(left, right), info)
+      }
+
+      if key_bindings.backward_delete_character.matches(info) {
+        if left.pop() is Some(_) {
+          render_line(self.console, prompt, left, right)
         }
-        Backspace =>
-          if left.pop() is Some(_) {
-            self.console.write("\u{8} \u{8}")
-          }
-        _ => {
-          let ch = info.key_char
-          if !ch.is_control() {
-            left.push(ch)
-            self.console.write(ch.to_string())
-          }
+        continue
+      }
+
+      if key_bindings.delete_character.matches(info) {
+        if right.pop() is Some(_) {
+          render_line(self.console, prompt, left, right)
         }
+        continue
+      }
+
+      if key_bindings.move_left.matches(info) {
+        if left.pop() is Some(ch) {
+          right.push(ch)
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      if key_bindings.move_right.matches(info) {
+        if right.pop() is Some(ch) {
+          left.push(ch)
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      if key_bindings.move_home.matches(info) {
+        let mut changed = false
+        while left.pop() is Some(ch) {
+          right.push(ch)
+          changed = true
+        }
+        if changed {
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      if key_bindings.move_end.matches(info) {
+        let mut changed = false
+        while right.pop() is Some(ch) {
+          left.push(ch)
+          changed = true
+        }
+        if changed {
+          render_line(self.console, prompt, left, right)
+        }
+        continue
+      }
+
+      let ch = info.key_char
+      if !ch.is_control() {
+        left.push(ch)
+        render_line(self.console, prompt, left, right)
       }
     }
   }
@@ -81,6 +140,30 @@ pub fn Prompt::dispose(self : Prompt) -> Unit {
 fn append_text(target : Array[Char], text : String) -> Unit {
   for ch in text {
     target.push(ch)
+  }
+}
+
+///|
+fn line_from_buffers(left : Array[Char], right : Array[Char]) -> String {
+  let chars = Array::new(capacity=left.length() + right.length())
+  chars.append(left)
+  right.rev_each(ch => chars.push(ch))
+  String::from_array(chars)
+}
+
+///|
+fn render_line(
+  console : &ConsolePort,
+  prompt : String,
+  left : Array[Char],
+  right : Array[Char],
+) -> Unit {
+  console.write("\r")
+  console.write(prompt)
+  console.write(line_from_buffers(left, right))
+  console.write("\u{1b}[K")
+  if right.length() > 0 {
+    console.write("\u{1b}[\{right.length()}D")
   }
 }
 

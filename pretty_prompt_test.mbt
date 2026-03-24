@@ -176,10 +176,8 @@ test "ports use trait objects" {
   ports.console.write("hello")
   assert_eq(console.write_calls.val, 1)
 
-  let copied = ports.clipboard.read_text() catch {
-    _ => abort("clipboard read should succeed")
-  }
-  assert_eq(copied, "before")
+  let copied = Some(ports.clipboard.read_text()) catch { _ => None }
+  assert_eq(copied, Some("before"))
 }
 
 ///|
@@ -446,11 +444,11 @@ test "prompt read_line submits typed text" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line(prompt="> ")
+  let result = prompt.read_line_with_prompt("> ")
   assert_true(result.is_success)
   assert_eq(result.text, "hi")
   assert_eq(result.submit_key_info.key, @console.Enter)
-  assert_eq(console.output.val, "> hi\n")
+  assert_true(console.output.val.contains("> "))
   assert_false(console.treat_control_c_as_input.val)
 
   prompt.dispose()
@@ -468,9 +466,70 @@ test "prompt read_line handles backspace" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line(prompt="# ")
+  let result = prompt.read_line_with_prompt("# ")
   assert_true(result.is_success)
   assert_eq(result.text, "a")
+
+  prompt.dispose()
+}
+
+///|
+test "prompt read_line inserts in middle with arrows" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('c', @console.C),
+    key('\u0000', @console.LeftArrow),
+    key('b', @console.B),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line_with_prompt("> ")
+  assert_true(result.is_success)
+  assert_eq(result.text, "abc")
+
+  prompt.dispose()
+}
+
+///|
+test "prompt read_line supports delete key" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('c', @console.C),
+    key('\u0000', @console.LeftArrow),
+    key('\u0000', @console.LeftArrow),
+    key('\u0000', @console.Delete),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line_with_prompt("> ")
+  assert_true(result.is_success)
+  assert_eq(result.text, "ac")
+
+  prompt.dispose()
+}
+
+///|
+test "prompt read_line supports home and end" {
+  let console = FakeInputConsole::new([
+    key('b', @console.B),
+    key('c', @console.C),
+    key('\u0000', @console.Home),
+    key('a', @console.A),
+    key('\u0000', @console.End),
+    key('d', @console.D),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line_with_prompt("> ")
+  assert_true(result.is_success)
+  assert_eq(result.text, "abcd")
 
   prompt.dispose()
 }
@@ -481,11 +540,54 @@ test "prompt read_line returns cancelled on ctrl c" {
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
 
-  let result = prompt.read_line(prompt="$ ")
+  let result = prompt.read_line_with_prompt("$ ")
   assert_false(result.is_success)
   assert_eq(result.text, "")
   assert_eq(result.submit_key_info.key, @console.C)
   assert_eq(result.submit_key_info.control, true)
+
+  prompt.dispose()
+}
+
+///|
+test "prompt read_line uses configured default prompt" {
+  let console = FakeInputConsole::new([
+    key('o', @console.O),
+    key('k', @console.K),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let configuration = @pretty_prompt.PromptConfiguration::new(prompt="pp> ")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard, configuration~)
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "ok")
+  assert_true(console.output.val.contains("pp> "))
+
+  prompt.dispose()
+}
+
+///|
+test "prompt read_line uses custom submit key binding" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('\u0004', @console.D, control=true),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let submit = @pretty_prompt.KeyPressPatterns::single(
+    @pretty_prompt.KeyPressPattern::new(@console.D, control=true),
+  )
+  let key_bindings = @pretty_prompt.KeyBindings::new(submit_prompt=submit)
+  let configuration = @pretty_prompt.PromptConfiguration::new(key_bindings~)
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard, configuration~)
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "ab")
+  assert_eq(result.submit_key_info.key, @console.D)
+  assert_true(result.submit_key_info.control)
 
   prompt.dispose()
 }
