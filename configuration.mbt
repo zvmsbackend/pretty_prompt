@@ -78,6 +78,8 @@ pub struct KeyBindings {
   move_word_right : KeyPressPatterns
   backward_delete_word : KeyPressPatterns
   delete_word : KeyPressPatterns
+  trigger_completion : KeyPressPatterns
+  dismiss_completion : KeyPressPatterns
 }
 
 ///|
@@ -167,6 +169,16 @@ fn default_delete_word_patterns() -> KeyPressPatterns {
 }
 
 ///|
+fn default_trigger_completion_patterns() -> KeyPressPatterns {
+  @console.Tab |> KeyPressPattern::new |> KeyPressPatterns::single
+}
+
+///|
+fn default_dismiss_completion_patterns() -> KeyPressPatterns {
+  @console.Escape |> KeyPressPattern::new |> KeyPressPatterns::single
+}
+
+///|
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns(),
   cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns(),
@@ -182,6 +194,8 @@ pub fn KeyBindings::new(
   move_word_right? : KeyPressPatterns = default_move_word_right_patterns(),
   backward_delete_word? : KeyPressPatterns = default_backward_delete_word_patterns(),
   delete_word? : KeyPressPatterns = default_delete_word_patterns(),
+  trigger_completion? : KeyPressPatterns = default_trigger_completion_patterns(),
+  dismiss_completion? : KeyPressPatterns = default_dismiss_completion_patterns(),
 ) -> KeyBindings {
   {
     submit_prompt,
@@ -198,6 +212,8 @@ pub fn KeyBindings::new(
     move_word_right,
     backward_delete_word,
     delete_word,
+    trigger_completion,
+    dismiss_completion,
   }
 }
 
@@ -212,6 +228,7 @@ pub struct PromptConfiguration {
   key_bindings : KeyBindings
   history : HistoryConfiguration
   highlighter : async (String) -> Array[FormatSpan]
+  completer : async (String, Int) -> Array[CompletionItem]
 }
 
 ///|
@@ -220,8 +237,9 @@ pub fn PromptConfiguration::new(
   key_bindings? : KeyBindings = KeyBindings::default(),
   history? : HistoryConfiguration = HistoryConfiguration::default(),
   highlighter? : async (String) -> Array[FormatSpan] = _ => [],
+  completer? : async (String, Int) -> Array[CompletionItem] = (_, _) => [],
 ) -> PromptConfiguration {
-  { prompt, key_bindings, history, highlighter }
+  { prompt, key_bindings, history, highlighter, completer }
 }
 
 ///|

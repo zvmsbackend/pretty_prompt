@@ -5,6 +5,7 @@ pub struct Prompt {
   configuration : PromptConfiguration
   history : HistoryLog
   cancel_controller : CancelController
+  completion_state : Ref[CompletionState?]
 }
 
 ///|
@@ -16,7 +17,14 @@ pub async fn Prompt::new(
   let cancel_controller = CancelController::new(console)
   let history = HistoryLog::new(configuration.history)
   history.load_persistent_history()
-  { console, clipboard, configuration, history, cancel_controller }
+  {
+    console,
+    clipboard,
+    configuration,
+    history,
+    cancel_controller,
+    completion_state: @ref.new(None),
+  }
 }
 
 ///|
@@ -44,19 +52,79 @@ pub async fn Prompt::read_line_with_prompt(
     let key_presses = read_key_presses(self.console)
     for key_press in key_presses {
       if key_press.pasted_text is Some(pasted) {
+        self.completion_state.val = None
         left.push_iter(pasted.iter())
         self.render_line(prompt, left, right)
         continue
       }
 
       let info = key_press.console_key_info
+
+      // 1. Check for global/mode-switching keys
       if key_bindings.cancel_prompt.matches(info) {
+        self.completion_state.val = None
         self.console.write_line("")
         self.cancel_controller.set_mode(AllowCancelSignal)
         return PromptResult::cancelled(info)
       }
 
+      // 2. Handle Completion Mode
+      if self.completion_state.val is Some(state) {
+        if key_bindings.dismiss_completion.matches(info) {
+          self.completion_state.val = None
+          self.render_line(prompt, left, right)
+          continue
+        }
+
+        if key_bindings.history_previous.matches(info) {
+          state.selected_index = (
+              state.selected_index + state.items.length() - 1
+            ) %
+            state.items.length()
+          self.render_line(prompt, left, right)
+          continue
+        }
+
+        if key_bindings.history_next.matches(info) {
+          state.selected_index = (state.selected_index + 1) %
+            state.items.length()
+          self.render_line(prompt, left, right)
+          continue
+        }
+
+        if key_bindings.submit_prompt.matches(info) ||
+          key_bindings.trigger_completion.matches(info) {
+          let item = state.items[state.selected_index]
+          // Simple replacement: clear current word and insert replacement
+          // A more robust implementation would use spanToBeReplaced from .NET version
+          while left.length() > 0 {
+            let ch = left[left.length() - 1]
+            if ch.is_whitespace() {
+              break
+            }
+            ignore(left.pop())
+          }
+          left.push_iter(item.replacement_text.iter())
+          self.completion_state.val = None
+          self.render_line(prompt, left, right)
+          continue
+        }
+      }
+
+      // 3. Trigger Completion
+      if key_bindings.trigger_completion.matches(info) {
+        let raw_line = line_from_buffers(left, right)
+        let items = (self.configuration.completer)(raw_line, left.length())
+        if items.length() > 0 {
+          self.completion_state.val = Some(CompletionState::new(items, ""))
+          self.render_line(prompt, left, right)
+        }
+        continue
+      }
+
+      // 4. Standard Keys (with completion dismissal)
       if key_bindings.history_previous.matches(info) {
+        self.completion_state.val = None
         if self.history.navigate_previous(line_from_buffers(left, right))
           is Some(entry) {
           set_line_buffers(left, right, entry)
@@ -281,6 +349,7 @@ async fn Prompt::render_line(
   left : Array[Char],
   right : Array[Char],
 ) -> Unit {
+  // 1. Render the main line
   self.console.write("\r")
   self.console.write(prompt)
   let raw_line = line_from_buffers(left, right)
@@ -288,9 +357,44 @@ async fn Prompt::render_line(
   let highlighted_line = apply_highlights(raw_line, spans)
   self.console.write(highlighted_line)
   self.console.write("\u{1b}[K")
-  let right_width = get_chars_width(right.iter())
-  if right_width > 0 {
-    self.console.write("\u{1b}[\{right_width}D")
+
+  // 2. Render completion list if any
+  let mut lines_down = 0
+  if self.completion_state.val is Some(state) {
+    let start = if state.selected_index < 2 {
+      0
+    } else {
+      state.selected_index - 2
+    }
+    let end = if start + 5 > state.items.length() {
+      state.items.length()
+    } else {
+      start + 5
+    }
+    for i in start..<end {
+      let item = state.items[i]
+      self.console.write("\n\r")
+      lines_down = lines_down + 1
+      if i == state.selected_index {
+        self.console.write("\u{1b}[7m> \{item.display_text}\u{1b}[0m")
+      } else {
+        self.console.write("  \{item.display_text}")
+      }
+      self.console.write("\u{1b}[K")
+    }
+    // Return to main line
+    if lines_down > 0 {
+      self.console.write("\u{1b}[\{lines_down}A")
+    }
+  }
+
+  // 3. Position the cursor correctly at the edit point
+  self.console.write("\r")
+  let prompt_width = get_string_width(prompt)
+  let left_width = get_chars_width(left.iter())
+  let total_move_right = prompt_width + left_width
+  if total_move_right > 0 {
+    self.console.write("\u{1b}[\{total_move_right}C")
   }
 }
 
