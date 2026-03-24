@@ -1,22 +1,25 @@
 ///|
+using @ports {trait ClipboardPort}
+
+///|
 struct FakeConsole {
-  treat_control_c_as_input : Ref[Bool]
-  next_handler_id : Ref[Int]
-  add_calls : Ref[Int]
-  removed_handler_id : Ref[Int?]
-  last_handler : Ref[((@console.ConsoleSpecialKey) -> Bool)?]
-  write_calls : Ref[Int]
+  mut treat_control_c_as_input : Bool
+  mut next_handler_id : Int
+  mut add_calls : Int
+  mut removed_handler_id : Int?
+  mut last_handler : ((@console.ConsoleSpecialKey) -> Bool)?
+  mut write_calls : Int
 }
 
 ///|
 fn FakeConsole::new() -> FakeConsole {
   {
-    treat_control_c_as_input: @ref.new(false),
-    next_handler_id: @ref.new(1),
-    add_calls: @ref.new(0),
-    removed_handler_id: @ref.new(None),
-    last_handler: @ref.new(None),
-    write_calls: @ref.new(0),
+    treat_control_c_as_input: false,
+    next_handler_id: 1,
+    add_calls: 0,
+    removed_handler_id: None,
+    last_handler: None,
+    write_calls: 0,
   }
 }
 
@@ -25,7 +28,7 @@ fn FakeConsole::trigger_cancel(
   self : FakeConsole,
   key : @console.ConsoleSpecialKey,
 ) -> Bool {
-  match self.last_handler.val {
+  match self.last_handler {
     Some(handler) => handler(key)
     None => false
   }
@@ -75,17 +78,17 @@ impl @pretty_prompt.ConsolePort for FakeConsole with get_window_top(self) {
 
 ///|
 impl @pretty_prompt.ConsolePort for FakeConsole with write(self, _value) {
-  self.write_calls.val = self.write_calls.val + 1
+  self.write_calls = self.write_calls + 1
 }
 
 ///|
 impl @pretty_prompt.ConsolePort for FakeConsole with write_line(self, _value) {
-  self.write_calls.val = self.write_calls.val + 1
+  self.write_calls = self.write_calls + 1
 }
 
 ///|
 impl @pretty_prompt.ConsolePort for FakeConsole with write_error(self, _value) {
-  self.write_calls.val = self.write_calls.val + 1
+  self.write_calls = self.write_calls + 1
 }
 
 ///|
@@ -93,7 +96,7 @@ impl @pretty_prompt.ConsolePort for FakeConsole with write_error_line(
   self,
   _value,
 ) {
-  self.write_calls.val = self.write_calls.val + 1
+  self.write_calls = self.write_calls + 1
 }
 
 ///|
@@ -115,7 +118,7 @@ impl @pretty_prompt.ConsolePort for FakeConsole with hide_cursor(self) {
 impl @pretty_prompt.ConsolePort for FakeConsole with get_treat_control_c_as_input(
   self,
 ) {
-  self.treat_control_c_as_input.val
+  self.treat_control_c_as_input
 }
 
 ///|
@@ -123,7 +126,7 @@ impl @pretty_prompt.ConsolePort for FakeConsole with set_treat_control_c_as_inpu
   self,
   value,
 ) {
-  self.treat_control_c_as_input.val = value
+  self.treat_control_c_as_input = value
 }
 
 ///|
@@ -131,10 +134,10 @@ impl @pretty_prompt.ConsolePort for FakeConsole with add_cancel_key_press_handle
   self,
   handler,
 ) {
-  self.add_calls.val = self.add_calls.val + 1
-  self.last_handler.val = Some(handler)
-  let id = self.next_handler_id.val
-  self.next_handler_id.val = id + 1
+  self.add_calls = self.add_calls + 1
+  self.last_handler = Some(handler)
+  let id = self.next_handler_id
+  self.next_handler_id = id + 1
   id
 }
 
@@ -143,28 +146,28 @@ impl @pretty_prompt.ConsolePort for FakeConsole with remove_cancel_key_press_han
   self,
   id,
 ) {
-  self.removed_handler_id.val = Some(id)
-  self.last_handler.val = None
+  self.removed_handler_id = Some(id)
+  self.last_handler = None
 }
 
 ///|
 struct FakeClipboard {
-  text : Ref[String]
+  mut text : String
 }
 
 ///|
 fn FakeClipboard::new(text : String) -> FakeClipboard {
-  { text: @ref.new(text) }
+  { text, }
 }
 
 ///|
-impl @pretty_prompt.ClipboardPort for FakeClipboard with read_text(self) {
-  self.text.val
+impl ClipboardPort for FakeClipboard with read_text(self) {
+  self.text
 }
 
 ///|
-impl @pretty_prompt.ClipboardPort for FakeClipboard with write_text(self, text) {
-  self.text.val = text
+impl ClipboardPort for FakeClipboard with write_text(self, text) {
+  self.text = text
 }
 
 ///|
@@ -174,7 +177,7 @@ test "ports use trait objects" {
   let ports = @pretty_prompt.Ports::new(console, clipboard)
 
   ports.console.write("hello")
-  assert_eq(console.write_calls.val, 1)
+  assert_eq(console.write_calls, 1)
 
   let copied = Some(ports.clipboard.read_text()) catch { _ => None }
   assert_eq(copied, Some("before"))
@@ -185,10 +188,10 @@ test "cancel controller toggles mode and handles cancel" {
   let console = FakeConsole::new()
   let controller = @pretty_prompt.CancelController::new(console)
 
-  assert_eq(console.add_calls.val, 1)
+  assert_eq(console.add_calls, 1)
 
-  controller.set_mode(@pretty_prompt.CaptureAsInput)
-  assert_true(console.treat_control_c_as_input.val)
+  controller.set_mode(CaptureAsInput)
+  assert_true(console.treat_control_c_as_input)
 
   let handled = console.trigger_cancel(@console.ControlC)
   assert_true(handled)
@@ -196,23 +199,22 @@ test "cancel controller toggles mode and handles cancel" {
   assert_true(controller.take_cancellation_requested())
   assert_false(controller.is_cancellation_requested())
 
-  controller.set_mode(@pretty_prompt.AllowCancelSignal)
-  assert_false(console.treat_control_c_as_input.val)
+  controller.set_mode(AllowCancelSignal)
+  assert_false(console.treat_control_c_as_input)
 
   controller.dispose()
-  assert_eq(console.removed_handler_id.val, Some(1))
+  assert_eq(console.removed_handler_id, Some(1))
 }
 
 ///|
 struct FakeInputConsole {
   keys : Array[@console.ConsoleKeyInfo]
-  index : Ref[Int]
+  mut index : Int
   batch_all : Bool
-  output : Ref[String]
-  treat_control_c_as_input : Ref[Bool]
-  next_handler_id : Ref[Int]
-  removed_handler_id : Ref[Int?]
-  last_handler : Ref[((@console.ConsoleSpecialKey) -> Bool)?]
+  mut output : String
+  mut treat_control_c_as_input : Bool
+  mut next_handler_id : Int
+  mut removed_handler_id : Int?
 }
 
 ///|
@@ -229,13 +231,12 @@ fn FakeInputConsole::new_with_batch(
 ) -> FakeInputConsole {
   {
     keys,
-    index: @ref.new(0),
+    index: 0,
     batch_all,
-    output: @ref.new(""),
-    treat_control_c_as_input: @ref.new(false),
-    next_handler_id: @ref.new(1),
-    removed_handler_id: @ref.new(None),
-    last_handler: @ref.new(None),
+    output: "",
+    treat_control_c_as_input: false,
+    next_handler_id: 1,
+    removed_handler_id: None,
   }
 }
 
@@ -255,11 +256,11 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with read_key(
   self,
   _intercept,
 ) {
-  if self.index.val >= self.keys.length() {
+  if self.index >= self.keys.length() {
     return key('\n', @console.Enter)
   }
-  let current = self.keys[self.index.val]
-  self.index.val = self.index.val + 1
+  let current = self.keys[self.index]
+  self.index += 1
   current
 }
 
@@ -267,7 +268,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with read_key(
 pub impl @pretty_prompt.ConsolePort for FakeInputConsole with key_available(
   self,
 ) {
-  self.batch_all && self.index.val < self.keys.length()
+  self.batch_all && self.index < self.keys.length()
 }
 
 ///|
@@ -312,7 +313,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_window_top(
 
 ///|
 pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write(self, value) {
-  self.output.val = "\{self.output.val}\{value}"
+  self.output = "\{self.output}\{value}"
 }
 
 ///|
@@ -320,7 +321,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_line(
   self,
   value,
 ) {
-  self.output.val = "\{self.output.val}\{value}\n"
+  self.output = "\{self.output}\{value}\n"
 }
 
 ///|
@@ -328,7 +329,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_error(
   self,
   value,
 ) {
-  self.output.val = "\{self.output.val}\{value}"
+  self.output = "\{self.output}\{value}"
 }
 
 ///|
@@ -336,7 +337,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_error_line(
   self,
   value,
 ) {
-  self.output.val = "\{self.output.val}\{value}\n"
+  self.output = "\{self.output}\{value}\n"
 }
 
 ///|
@@ -358,7 +359,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with hide_cursor(self) 
 pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_treat_control_c_as_input(
   self,
 ) {
-  self.treat_control_c_as_input.val
+  self.treat_control_c_as_input
 }
 
 ///|
@@ -366,17 +367,16 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with set_treat_control_
   self,
   value,
 ) {
-  self.treat_control_c_as_input.val = value
+  self.treat_control_c_as_input = value
 }
 
 ///|
 pub impl @pretty_prompt.ConsolePort for FakeInputConsole with add_cancel_key_press_handler(
   self,
-  handler,
+  _handler,
 ) {
-  self.last_handler.val = Some(handler)
-  let id = self.next_handler_id.val
-  self.next_handler_id.val = id + 1
+  let id = self.next_handler_id
+  self.next_handler_id = id + 1
   id
 }
 
@@ -385,8 +385,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with remove_cancel_key_
   self,
   id,
 ) {
-  self.removed_handler_id.val = Some(id)
-  self.last_handler.val = None
+  self.removed_handler_id = Some(id)
 }
 
 ///|
@@ -448,11 +447,11 @@ async test "prompt read_line submits typed text" {
   assert_true(result.is_success)
   assert_eq(result.text, "hi")
   assert_eq(result.submit_key_info.key, @console.Enter)
-  assert_true(console.output.val.contains("> "))
-  assert_false(console.treat_control_c_as_input.val)
+  assert_true(console.output.contains("> "))
+  assert_false(console.treat_control_c_as_input)
 
   prompt.dispose()
-  assert_eq(console.removed_handler_id.val, Some(1))
+  assert_eq(console.removed_handler_id, Some(1))
 }
 
 ///|
@@ -565,7 +564,7 @@ async test "prompt read_line uses configured default prompt" {
   let result = prompt.read_line()
   assert_true(result.is_success)
   assert_eq(result.text, "ok")
-  assert_true(console.output.val.contains("pp> "))
+  assert_true(console.output.contains("pp> "))
 
   prompt.dispose()
 }

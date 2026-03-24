@@ -1,0 +1,26 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "sennenki/pretty_prompt/system"
+
+import {
+  "sennenki/console",
+  "sennenki/pretty_prompt/ports",
+}
+
+// Values
+
+// Errors
+
+// Types and methods
+pub struct SystemClipboardPort {
+}
+pub fn SystemClipboardPort::new() -> Self
+pub impl @ports.ClipboardPort for SystemClipboardPort
+
+type SystemConsolePort
+pub fn SystemConsolePort::new() -> Self
+pub impl @ports.ConsolePort for SystemConsolePort
+
+// Type aliases
+
+// Traits
+

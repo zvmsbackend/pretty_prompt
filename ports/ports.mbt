@@ -27,7 +27,7 @@ pub(open) trait ClipboardPort {
 }
 
 ///|
-pub suberror ClipboardPortError {
+pub(all) suberror ClipboardPortError {
   NotAvailable
   PermissionDenied
   BackendFailure(String)

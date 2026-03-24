@@ -11,6 +11,11 @@ pub fn Selection::new(anchor : Int, active : Int) -> Selection {
 }
 
 ///|
+pub fn Selection::set_active(self : Selection, active : Int) -> Unit {
+  self.active = active
+}
+
+///|
 /// 获取选区的规格化范围 [min, max)
 pub fn Selection::range(self : Selection) -> (Int, Int) {
   if self.anchor <= self.active {

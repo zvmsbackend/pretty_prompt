@@ -1,4 +1,7 @@
 ///|
+using @ports {trait ConsolePort}
+
+///|
 pub struct KeyPress {
   console_key_info : @console.ConsoleKeyInfo
   pasted_text : String?

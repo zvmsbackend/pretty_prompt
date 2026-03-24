@@ -2,12 +2,14 @@
 package "sennenki/pretty_prompt"
 
 import {
-  "moonbitlang/core/ref",
-  "sennenki/console",
+  "sennenki/pretty_prompt/core",
+  "sennenki/pretty_prompt/editing",
+  "sennenki/pretty_prompt/ports",
+  "sennenki/pretty_prompt/rendering",
 }
 
 // Values
-pub fn apply_highlights(String, Array[FormatSpan]) -> String
+pub fn apply_highlights(String, Array[@rendering.FormatSpan]) -> String
 
 pub fn get_char_width(Char) -> Int
 
@@ -17,338 +19,78 @@ pub fn get_string_width(String) -> Int
 
 pub fn is_word_boundary(Char?, Char?) -> Bool
 
-pub fn read_key_presses(&ConsolePort) -> Array[KeyPress]
+pub fn read_key_presses(&@ports.ConsolePort) -> Array[@core.KeyPress]
 
-pub fn render_diff(&ConsolePort, Screen, Screen, Int, Int) -> Unit
+pub fn render_diff(&@ports.ConsolePort, @rendering.Screen, @rendering.Screen, Int, Int) -> Unit
 
-pub fn wrap_text(String, Int, Int) -> WrappedText
+pub fn wrap_text(String, Int, Int) -> @rendering.WrappedText
 
 // Errors
-pub suberror ClipboardPortError {
-  NotAvailable
-  PermissionDenied
-  BackendFailure(String)
-} derive(Eq, Show)
 
 // Types and methods
-pub(all) enum AnsiColor {
-  Default
-  Black
-  Red
-  Green
-  Yellow
-  Blue
-  Magenta
-  Cyan
-  White
-  BrightBlack
-  BrightRed
-  BrightGreen
-  BrightYellow
-  BrightBlue
-  BrightMagenta
-  BrightCyan
-  BrightWhite
-  Color256(Int)
-  Rgb(Int, Int, Int)
-} derive(Eq)
-
-pub struct CancelController {
-  console : &ConsolePort
-  cancellation_requested : @ref.Ref[Bool]
-  handler_id : Int
-}
-pub fn CancelController::dispose(Self) -> Unit
-pub fn CancelController::is_cancellation_requested(Self) -> Bool
-pub fn CancelController::new(&ConsolePort) -> Self
-pub fn CancelController::set_mode(Self, ControlCMode) -> Unit
-pub fn CancelController::take_cancellation_requested(Self) -> Bool
-
-pub struct Cell {
-  char : Char
-  format : ConsoleFormat
-} derive(Eq)
-pub fn Cell::new(Char, ConsoleFormat) -> Self
-pub fn Cell::op_equal(Self, Self) -> Bool
-pub impl Default for Cell
-
-pub struct CompletionItem {
-  replacement_text : String
-  display_text : String
-  filter_text : String
-  description : String
-}
-pub fn CompletionItem::get_priority(Self, String) -> Int
-pub fn CompletionItem::new(String, display_text? : String, filter_text? : String, description? : String) -> Self
-
-pub struct CompletionState {
-  mut items : Array[CompletionItem]
-  mut selected_index : Int
-  mut filter_prefix : String
-  all_items : Array[CompletionItem]
-}
-pub fn CompletionState::filter(Self, String) -> Unit
-pub fn CompletionState::new(Array[CompletionItem], String) -> Self
-
-pub struct ConsoleFormat {
-  foreground : AnsiColor
-  background : AnsiColor
-  bold : Bool
-  italic : Bool
-  underline : Bool
-} derive(Eq)
-pub fn ConsoleFormat::new(foreground? : AnsiColor, background? : AnsiColor, bold? : Bool, italic? : Bool, underline? : Bool) -> Self
-pub impl Default for ConsoleFormat
-
-pub(all) enum ControlCMode {
-  CaptureAsInput
-  AllowCancelSignal
-} derive(Eq, Show)
-
-pub struct FormatSpan {
-  start : Int
-  length : Int
-  format : ConsoleFormat
-}
-pub fn FormatSpan::new(Int, Int, ConsoleFormat) -> Self
-
-pub struct FormattedString {
-  text : String
-  spans : Array[FormatSpan]
-}
-pub fn FormattedString::new(String, spans? : Array[FormatSpan]) -> Self
-pub fn FormattedString::width(Self) -> Int
-
-pub struct HistoryConfiguration {
-  persistent_history_filepath : String?
-  max_entries : Int
-}
-pub fn HistoryConfiguration::new(persistent_history_filepath? : String, max_entries? : Int) -> Self
-pub impl Default for HistoryConfiguration
-
-pub struct HistoryLog {
-  entries : Array[String]
-  config : HistoryConfiguration
-  mut navigation_index : Int?
-  mut unsubmitted_buffer : String
-  mut submissions_since_last_trim : Int
-}
-pub fn HistoryLog::entry_count(Self) -> Int
-pub async fn HistoryLog::load_persistent_history(Self) -> Unit
-pub fn HistoryLog::navigate_next(Self) -> String?
-pub fn HistoryLog::navigate_previous(Self, String) -> String?
-pub fn HistoryLog::navigate_search(Self, String, Int) -> (Int, String)?
-pub fn HistoryLog::new(HistoryConfiguration) -> Self
-pub fn HistoryLog::reset_navigation(Self) -> Unit
-pub async fn HistoryLog::save_persistent_history_full(Self) -> Unit
-pub async fn HistoryLog::track_submission(Self, String) -> Unit
-
-pub struct KeyBindings {
-  submit_prompt : KeyPressPatterns
-  cancel_prompt : KeyPressPatterns
-  history_previous : KeyPressPatterns
-  history_next : KeyPressPatterns
-  backward_delete_character : KeyPressPatterns
-  delete_character : KeyPressPatterns
-  move_left : KeyPressPatterns
-  move_right : KeyPressPatterns
-  move_home : KeyPressPatterns
-  move_end : KeyPressPatterns
-  move_word_left : KeyPressPatterns
-  move_word_right : KeyPressPatterns
-  backward_delete_word : KeyPressPatterns
-  delete_word : KeyPressPatterns
-  trigger_completion : KeyPressPatterns
-  dismiss_completion : KeyPressPatterns
-  undo : KeyPressPatterns
-  redo : KeyPressPatterns
-  move_left_selection : KeyPressPatterns
-  move_right_selection : KeyPressPatterns
-  move_home_selection : KeyPressPatterns
-  move_end_selection : KeyPressPatterns
-  copy_selection : KeyPressPatterns
-  cut_selection : KeyPressPatterns
-  kill_line_tail : KeyPressPatterns
-  kill_line_head : KeyPressPatterns
-  yank : KeyPressPatterns
-  yank_pop : KeyPressPatterns
-  reverse_search : KeyPressPatterns
-}
-pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns, move_left_selection? : KeyPressPatterns, move_right_selection? : KeyPressPatterns, move_home_selection? : KeyPressPatterns, move_end_selection? : KeyPressPatterns, copy_selection? : KeyPressPatterns, cut_selection? : KeyPressPatterns, kill_line_tail? : KeyPressPatterns, kill_line_head? : KeyPressPatterns, yank? : KeyPressPatterns, yank_pop? : KeyPressPatterns, reverse_search? : KeyPressPatterns) -> Self
-
-pub struct KeyPress {
-  console_key_info : @console.ConsoleKeyInfo
-  pasted_text : String?
-}
-pub fn KeyPress::from_console_key_info(@console.ConsoleKeyInfo) -> Self
-pub fn KeyPress::from_pasted_text(String) -> Self
-
-type KeyPressPattern
-pub fn KeyPressPattern::matches(Self, @console.ConsoleKeyInfo) -> Bool
-pub fn KeyPressPattern::new(@console.ConsoleKey, shift? : Bool, alt? : Bool, control? : Bool) -> Self
-
-type KeyPressPatterns
-pub fn KeyPressPatterns::empty() -> Self
-pub fn KeyPressPatterns::has_any(Self) -> Bool
-pub fn KeyPressPatterns::matches(Self, @console.ConsoleKeyInfo) -> Bool
-pub fn KeyPressPatterns::new(Array[KeyPressPattern]) -> Self
-pub fn KeyPressPatterns::single(KeyPressPattern) -> Self
-
-pub struct KillRing {
-  items : Array[String]
-  mut current_index : Int
-  max_size : Int
-}
-pub fn KillRing::add(Self, String) -> Unit
-pub fn KillRing::new(max_size? : Int) -> Self
-pub fn KillRing::yank(Self) -> String?
-pub fn KillRing::yank_pop(Self) -> String?
-
-pub struct OverloadItem {
-  signature : String
-  summary : String
-  parameters : Array[Parameter]
-}
-pub fn OverloadItem::new(String, summary? : String, parameters? : Array[Parameter]) -> Self
-
-pub struct OverloadState {
-  items : Array[OverloadItem]
-  mut selected_index : Int
-}
-pub fn OverloadState::new(Array[OverloadItem]) -> Self
-
-pub struct Parameter {
-  name : String
-  description : String
-}
-pub fn Parameter::new(String, String) -> Self
-
-pub struct Ports {
-  console : &ConsolePort
-  clipboard : &ClipboardPort
-}
-pub fn Ports::new(&ConsolePort, &ClipboardPort) -> Self
-
-pub struct Prompt {
-  console : &ConsolePort
-  clipboard : &ClipboardPort
-  configuration : PromptConfiguration
-  history : HistoryLog
-  cancel_controller : CancelController
-  mut completion_state : CompletionState?
-  mut last_screen : Screen?
-  undo_manager : UndoManager
-  mut selection : Selection?
-  mut overload_state : OverloadState?
-  kill_ring : KillRing
-  mut search_state : SearchState?
-}
-pub async fn Prompt::dispose(Self) -> Unit
-pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
-pub async fn Prompt::read_line(Self) -> PromptResult
-pub async fn Prompt::read_line_with_prompt(Self, FormattedString) -> PromptResult
-pub fn Prompt::take_execution_cancellation_requested(Self) -> Bool
-
-pub struct PromptConfiguration {
-  prompt : FormattedString
-  key_bindings : KeyBindings
-  history : HistoryConfiguration
-  highlighter : async (String) -> Array[FormatSpan]
-  completer : async (String, Int) -> Array[CompletionItem]
-  overload_provider : async (String, Int) -> Array[OverloadItem]
-  selection_background : AnsiColor
-  use_colors : Bool
-  max_completion_items_count : Int
-  kill_ring_max_size : Int
-}
-pub fn PromptConfiguration::default() -> Self
-pub fn PromptConfiguration::new(prompt? : FormattedString, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan], completer? : async (String, Int) -> Array[CompletionItem], overload_provider? : async (String, Int) -> Array[OverloadItem], selection_background? : AnsiColor, use_colors? : Bool, max_completion_items_count? : Int, kill_ring_max_size? : Int) -> Self
-
-pub struct PromptResult {
-  is_success : Bool
-  text : String
-  submit_key_info : @console.ConsoleKeyInfo
-}
-pub fn PromptResult::cancelled(@console.ConsoleKeyInfo) -> Self
-pub fn PromptResult::submitted(String, @console.ConsoleKeyInfo) -> Self
-
-pub struct Screen {
-  rows : Array[Array[Cell]]
-  width : Int
-  height : Int
-  mut cursor_row : Int
-  mut cursor_col : Int
-}
-pub fn Screen::draw_string(Self, Int, Int, String, ConsoleFormat) -> Unit
-pub fn Screen::new(Int, Int) -> Self
-
-pub struct SearchState {
-  mut query : String
-  mut history_index : Int
-}
-pub fn SearchState::new() -> Self
-
-pub struct Selection {
-  anchor : Int
-  mut active : Int
-}
-pub fn Selection::contains(Self, Int) -> Bool
-pub fn Selection::new(Int, Int) -> Self
-pub fn Selection::range(Self) -> (Int, Int)
-
-pub struct SystemClipboardPort {
-}
-pub fn SystemClipboardPort::new() -> Self
-pub impl ClipboardPort for SystemClipboardPort
-
-type SystemConsolePort
-pub fn SystemConsolePort::new() -> Self
-pub impl ConsolePort for SystemConsolePort
-
-type UndoManager
-pub fn UndoManager::new(String, Int) -> Self
-pub fn UndoManager::redo(Self) -> UndoRecord?
-pub fn UndoManager::track(Self, String, Int) -> Unit
-pub fn UndoManager::undo(Self) -> UndoRecord?
-
-pub struct UndoRecord {
-  text : String
-  cursor_pos : Int
-}
-pub fn UndoRecord::new(String, Int) -> Self
-
-pub struct WrappedText {
-  lines : Array[String]
-  cursor_row : Int
-  cursor_col : Int
-}
 
 // Type aliases
+pub using @rendering {type AnsiColor}
+
+pub using @ports {type CancelController}
+
+pub using @rendering {type Cell}
+
+pub using @ports {type ClipboardPortError}
+
+pub using @editing {type CompletionItem}
+
+pub using @editing {type CompletionState}
+
+pub using @rendering {type ConsoleFormat}
+
+pub using @ports {type ControlCMode}
+
+pub using @rendering {type FormatSpan}
+
+pub using @rendering {type FormattedString}
+
+pub using @editing {type HistoryConfiguration}
+
+pub using @editing {type HistoryLog}
+
+pub using @core {type KeyBindings}
+
+pub using @core {type KeyPress}
+
+pub using @core {type KeyPressPattern}
+
+pub using @core {type KeyPressPatterns}
+
+pub using @editing {type KillRing}
+
+pub using @editing {type OverloadItem}
+
+pub using @editing {type OverloadState}
+
+pub using @editing {type Parameter}
+
+pub using @ports {type Ports}
+
+pub using @core {type Prompt}
+
+pub using @core {type PromptConfiguration}
+
+pub using @core {type PromptResult}
+
+pub using @rendering {type Screen}
+
+pub using @editing {type SearchState}
+
+pub using @editing {type Selection}
+
+pub using @editing {type UndoRecord}
+
+pub using @rendering {type WrappedText}
+
+pub using @ports {trait ClipboardPort}
+
+pub using @ports {trait ConsolePort}
 
 // Traits
-pub(open) trait ClipboardPort {
-  read_text(Self) -> String raise ClipboardPortError
-  write_text(Self, String) -> Unit raise ClipboardPortError
-}
-
-pub(open) trait ConsolePort {
-  read_key(Self, Bool) -> @console.ConsoleKeyInfo
-  key_available(Self) -> Bool
-  is_error_redirected(Self) -> Bool
-  get_cursor_top(Self) -> Int
-  get_buffer_width(Self) -> Int
-  get_window_height(Self) -> Int
-  get_window_top(Self) -> Int
-  write(Self, String) -> Unit
-  write_line(Self, String) -> Unit
-  write_error(Self, String) -> Unit
-  write_error_line(Self, String) -> Unit
-  clear(Self) -> Unit
-  show_cursor(Self) -> Unit
-  hide_cursor(Self) -> Unit
-  get_treat_control_c_as_input(Self) -> Bool
-  set_treat_control_c_as_input(Self, Bool) -> Unit
-  add_cancel_key_press_handler(Self, (@console.ConsoleSpecialKey) -> Bool) -> Int
-  remove_cancel_key_press_handler(Self, Int) -> Unit
-}
 

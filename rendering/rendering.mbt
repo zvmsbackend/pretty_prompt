@@ -37,6 +37,12 @@ pub struct Screen {
 }
 
 ///|
+pub fn Screen::set_cursor(self : Screen, row : Int, col : Int) -> Unit {
+  self.cursor_row = row
+  self.cursor_col = col
+}
+
+///|
 /// 创建指定大小的空屏幕
 pub fn Screen::new(height : Int, width : Int) -> Screen {
   let rows = Array::new(capacity=height)
@@ -82,7 +88,7 @@ pub fn Screen::draw_string(
 ///|
 /// 将新旧屏幕差异输出到控制台
 pub fn render_diff(
-  console : &ConsolePort,
+  console : &@ports.ConsolePort,
   new_screen : Screen,
   old_screen : Screen,
   base_row : Int,

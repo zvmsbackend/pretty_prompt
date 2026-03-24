@@ -1,0 +1,114 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "sennenki/pretty_prompt/core"
+
+import {
+  "sennenki/console",
+  "sennenki/pretty_prompt/editing",
+  "sennenki/pretty_prompt/ports",
+  "sennenki/pretty_prompt/rendering",
+}
+
+// Values
+pub fn read_key_presses(&@ports.ConsolePort) -> Array[KeyPress]
+
+// Errors
+
+// Types and methods
+pub struct KeyBindings {
+  submit_prompt : KeyPressPatterns
+  cancel_prompt : KeyPressPatterns
+  history_previous : KeyPressPatterns
+  history_next : KeyPressPatterns
+  backward_delete_character : KeyPressPatterns
+  delete_character : KeyPressPatterns
+  move_left : KeyPressPatterns
+  move_right : KeyPressPatterns
+  move_home : KeyPressPatterns
+  move_end : KeyPressPatterns
+  move_word_left : KeyPressPatterns
+  move_word_right : KeyPressPatterns
+  backward_delete_word : KeyPressPatterns
+  delete_word : KeyPressPatterns
+  trigger_completion : KeyPressPatterns
+  dismiss_completion : KeyPressPatterns
+  undo : KeyPressPatterns
+  redo : KeyPressPatterns
+  move_left_selection : KeyPressPatterns
+  move_right_selection : KeyPressPatterns
+  move_home_selection : KeyPressPatterns
+  move_end_selection : KeyPressPatterns
+  copy_selection : KeyPressPatterns
+  cut_selection : KeyPressPatterns
+  kill_line_tail : KeyPressPatterns
+  kill_line_head : KeyPressPatterns
+  yank : KeyPressPatterns
+  yank_pop : KeyPressPatterns
+  reverse_search : KeyPressPatterns
+}
+pub fn KeyBindings::new(submit_prompt? : KeyPressPatterns, cancel_prompt? : KeyPressPatterns, history_previous? : KeyPressPatterns, history_next? : KeyPressPatterns, backward_delete_character? : KeyPressPatterns, delete_character? : KeyPressPatterns, move_left? : KeyPressPatterns, move_right? : KeyPressPatterns, move_home? : KeyPressPatterns, move_end? : KeyPressPatterns, move_word_left? : KeyPressPatterns, move_word_right? : KeyPressPatterns, backward_delete_word? : KeyPressPatterns, delete_word? : KeyPressPatterns, trigger_completion? : KeyPressPatterns, dismiss_completion? : KeyPressPatterns, undo? : KeyPressPatterns, redo? : KeyPressPatterns, move_left_selection? : KeyPressPatterns, move_right_selection? : KeyPressPatterns, move_home_selection? : KeyPressPatterns, move_end_selection? : KeyPressPatterns, copy_selection? : KeyPressPatterns, cut_selection? : KeyPressPatterns, kill_line_tail? : KeyPressPatterns, kill_line_head? : KeyPressPatterns, yank? : KeyPressPatterns, yank_pop? : KeyPressPatterns, reverse_search? : KeyPressPatterns) -> Self
+
+pub struct KeyPress {
+  console_key_info : @console.ConsoleKeyInfo
+  pasted_text : String?
+}
+pub fn KeyPress::from_console_key_info(@console.ConsoleKeyInfo) -> Self
+pub fn KeyPress::from_pasted_text(String) -> Self
+
+type KeyPressPattern
+pub fn KeyPressPattern::matches(Self, @console.ConsoleKeyInfo) -> Bool
+pub fn KeyPressPattern::new(@console.ConsoleKey, shift? : Bool, alt? : Bool, control? : Bool) -> Self
+
+type KeyPressPatterns
+pub fn KeyPressPatterns::empty() -> Self
+pub fn KeyPressPatterns::has_any(Self) -> Bool
+pub fn KeyPressPatterns::matches(Self, @console.ConsoleKeyInfo) -> Bool
+pub fn KeyPressPatterns::new(Array[KeyPressPattern]) -> Self
+pub fn KeyPressPatterns::single(KeyPressPattern) -> Self
+
+pub struct Prompt {
+  console : &@ports.ConsolePort
+  clipboard : &@ports.ClipboardPort
+  configuration : PromptConfiguration
+  history : @editing.HistoryLog
+  cancel_controller : @ports.CancelController
+  mut completion_state : @editing.CompletionState?
+  mut last_screen : @rendering.Screen?
+  undo_manager : @editing.UndoManager
+  mut selection : @editing.Selection?
+  mut overload_state : @editing.OverloadState?
+  kill_ring : @editing.KillRing
+  mut search_state : @editing.SearchState?
+}
+pub async fn Prompt::dispose(Self) -> Unit
+pub async fn Prompt::new(&@ports.ConsolePort, &@ports.ClipboardPort, configuration? : PromptConfiguration) -> Self
+pub async fn Prompt::read_line(Self) -> PromptResult
+pub async fn Prompt::read_line_with_prompt(Self, @rendering.FormattedString) -> PromptResult
+pub fn Prompt::take_execution_cancellation_requested(Self) -> Bool
+
+pub struct PromptConfiguration {
+  prompt : @rendering.FormattedString
+  key_bindings : KeyBindings
+  history : @editing.HistoryConfiguration
+  highlighter : async (String) -> Array[@rendering.FormatSpan]
+  completer : async (String, Int) -> Array[@editing.CompletionItem]
+  overload_provider : async (String, Int) -> Array[@editing.OverloadItem]
+  selection_background : @rendering.AnsiColor
+  use_colors : Bool
+  max_completion_items_count : Int
+  kill_ring_max_size : Int
+}
+pub fn PromptConfiguration::default() -> Self
+pub fn PromptConfiguration::new(prompt? : @rendering.FormattedString, key_bindings? : KeyBindings, history? : @editing.HistoryConfiguration, highlighter? : async (String) -> Array[@rendering.FormatSpan], completer? : async (String, Int) -> Array[@editing.CompletionItem], overload_provider? : async (String, Int) -> Array[@editing.OverloadItem], selection_background? : @rendering.AnsiColor, use_colors? : Bool, max_completion_items_count? : Int, kill_ring_max_size? : Int) -> Self
+
+pub struct PromptResult {
+  is_success : Bool
+  text : String
+  submit_key_info : @console.ConsoleKeyInfo
+}
+pub fn PromptResult::cancelled(@console.ConsoleKeyInfo) -> Self
+pub fn PromptResult::submitted(String, @console.ConsoleKeyInfo) -> Self
+
+// Type aliases
+
+// Traits
+

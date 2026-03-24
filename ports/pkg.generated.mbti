@@ -1,0 +1,69 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "sennenki/pretty_prompt/ports"
+
+import {
+  "moonbitlang/core/ref",
+  "sennenki/console",
+}
+
+// Values
+
+// Errors
+pub(all) suberror ClipboardPortError {
+  NotAvailable
+  PermissionDenied
+  BackendFailure(String)
+} derive(Eq, Show)
+
+// Types and methods
+pub struct CancelController {
+  console : &ConsolePort
+  cancellation_requested : @ref.Ref[Bool]
+  handler_id : Int
+}
+pub fn CancelController::dispose(Self) -> Unit
+pub fn CancelController::is_cancellation_requested(Self) -> Bool
+pub fn CancelController::new(&ConsolePort) -> Self
+pub fn CancelController::set_mode(Self, ControlCMode) -> Unit
+pub fn CancelController::take_cancellation_requested(Self) -> Bool
+
+pub(all) enum ControlCMode {
+  CaptureAsInput
+  AllowCancelSignal
+} derive(Eq, Show)
+
+pub struct Ports {
+  console : &ConsolePort
+  clipboard : &ClipboardPort
+}
+pub fn Ports::new(&ConsolePort, &ClipboardPort) -> Self
+
+// Type aliases
+
+// Traits
+pub(open) trait ClipboardPort {
+  read_text(Self) -> String raise ClipboardPortError
+  write_text(Self, String) -> Unit raise ClipboardPortError
+}
+
+pub(open) trait ConsolePort {
+  read_key(Self, Bool) -> @console.ConsoleKeyInfo
+  key_available(Self) -> Bool
+  is_error_redirected(Self) -> Bool
+  get_cursor_top(Self) -> Int
+  get_buffer_width(Self) -> Int
+  get_window_height(Self) -> Int
+  get_window_top(Self) -> Int
+  write(Self, String) -> Unit
+  write_line(Self, String) -> Unit
+  write_error(Self, String) -> Unit
+  write_error_line(Self, String) -> Unit
+  clear(Self) -> Unit
+  show_cursor(Self) -> Unit
+  hide_cursor(Self) -> Unit
+  get_treat_control_c_as_input(Self) -> Bool
+  set_treat_control_c_as_input(Self, Bool) -> Unit
+  add_cancel_key_press_handler(Self, (@console.ConsoleSpecialKey) -> Bool) -> Int
+  remove_cancel_key_press_handler(Self, Int) -> Unit
+}
+

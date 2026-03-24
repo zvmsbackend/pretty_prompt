@@ -1,4 +1,33 @@
 ///|
+using @ports {trait ClipboardPort, type CancelController}
+
+///|
+using @rendering {
+  type FormattedString,
+  type FormatSpan,
+  type ConsoleFormat,
+  type Screen,
+  type Cell,
+  wrap_text,
+  get_chars_width,
+  get_char_width,
+  render_diff,
+}
+
+///|
+using @editing {
+  type HistoryLog,
+  type CompletionState,
+  type OverloadState,
+  type UndoManager,
+  type Selection,
+  type KillRing,
+  type SearchState,
+  type UndoRecord,
+  type OverloadItem,
+}
+
+///|
 pub struct Prompt {
   console : &ConsolePort
   clipboard : &ClipboardPort
@@ -93,7 +122,7 @@ pub async fn Prompt::read_line_with_prompt(
         if key_bindings.reverse_search.matches(info) {
           if self.history.navigate_search(state.query, state.history_index - 1)
             is Some(res) {
-            state.history_index = res.0
+            state.set_history_index(res.0)
             self.set_line_buffers(left, right, res.1)
           }
           self.render_line(prompt, left, right)
@@ -111,11 +140,11 @@ pub async fn Prompt::read_line_with_prompt(
         }
         if key_bindings.backward_delete_character.matches(info) {
           if state.query.length() > 0 {
-            state.query = state.query
-              .sub(end=state.query.length() - 1)
-              .to_string()
+            state.set_query(
+              state.query.sub(end=state.query.length() - 1).to_string(),
+            )
             if self.history.navigate_search(state.query, -1) is Some(res) {
-              state.history_index = res.0
+              state.set_history_index(res.0)
               self.set_line_buffers(left, right, res.1)
             }
           }
@@ -124,9 +153,9 @@ pub async fn Prompt::read_line_with_prompt(
         }
         let ch = info.key_char
         if !ch.is_control() {
-          state.query = state.query + ch.to_string()
+          state.set_query(state.query + ch.to_string())
           if self.history.navigate_search(state.query, -1) is Some(res) {
-            state.history_index = res.0
+            state.set_history_index(res.0)
             self.set_line_buffers(left, right, res.1)
           }
           self.render_line(prompt, left, right)
@@ -148,12 +177,14 @@ pub async fn Prompt::read_line_with_prompt(
         if key_bindings.history_previous.matches(info) {
           match self.completion_state {
             Some(s) =>
-              s.selected_index = (s.selected_index + s.items.length() - 1) %
-                s.items.length()
+              s.set_selected_index(
+                (s.selected_index + s.items.length() - 1) % s.items.length(),
+              )
             None =>
               if self.overload_state is Some(s) {
-                s.selected_index = (s.selected_index + s.items.length() - 1) %
-                  s.items.length()
+                s.set_selected_index(
+                  (s.selected_index + s.items.length() - 1) % s.items.length(),
+                )
               }
           }
           self.render_line(prompt, left, right)
@@ -163,10 +194,10 @@ pub async fn Prompt::read_line_with_prompt(
         if key_bindings.history_next.matches(info) {
           match self.completion_state {
             Some(s) =>
-              s.selected_index = (s.selected_index + 1) % s.items.length()
+              s.set_selected_index((s.selected_index + 1) % s.items.length())
             None =>
               if self.overload_state is Some(s) {
-                s.selected_index = (s.selected_index + 1) % s.items.length()
+                s.set_selected_index((s.selected_index + 1) % s.items.length())
               }
           }
           self.render_line(prompt, left, right)
@@ -506,7 +537,7 @@ fn Prompt::handle_selection_movement(
   match self.selection {
     None => self.selection = Some(Selection::new(old_pos, new_pos))
     Some(sel) => {
-      sel.active = new_pos
+      sel.set_active(new_pos)
       if sel.anchor == sel.active {
         self.selection = None
       }
@@ -710,10 +741,9 @@ async fn Prompt::render_line(
           }
           if self.selection is Some(sel) {
             if sel.contains(i) {
-              format = {
-                ..format,
-                background: self.configuration.selection_background,
-              }
+              format = format.with_background(
+                self.configuration.selection_background,
+              )
             }
           }
         }
@@ -728,8 +758,7 @@ async fn Prompt::render_line(
       current_text_pos = current_text_pos + 1
     }
   }
-  new_screen.cursor_row = wrapped.cursor_row
-  new_screen.cursor_col = wrapped.cursor_col
+  new_screen.set_cursor(wrapped.cursor_row, wrapped.cursor_col)
 
   // 5. Draw Overloads & Completions
   let mut next_row = wrapped.lines.length()

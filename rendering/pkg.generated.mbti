@@ -1,0 +1,101 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "sennenki/pretty_prompt/rendering"
+
+import {
+  "sennenki/pretty_prompt/ports",
+}
+
+// Values
+pub fn apply_highlights(String, Array[FormatSpan]) -> String
+
+pub fn get_char_width(Char) -> Int
+
+pub fn get_chars_width(Iter[Char]) -> Int
+
+pub fn get_string_width(String) -> Int
+
+pub fn is_word_boundary(Char?, Char?) -> Bool
+
+pub fn render_diff(&@ports.ConsolePort, Screen, Screen, Int, Int) -> Unit
+
+pub fn wrap_text(String, Int, Int) -> WrappedText
+
+// Errors
+
+// Types and methods
+pub(all) enum AnsiColor {
+  Default
+  Black
+  Red
+  Green
+  Yellow
+  Blue
+  Magenta
+  Cyan
+  White
+  BrightBlack
+  BrightRed
+  BrightGreen
+  BrightYellow
+  BrightBlue
+  BrightMagenta
+  BrightCyan
+  BrightWhite
+  Color256(Int)
+  Rgb(Int, Int, Int)
+} derive(Eq)
+
+pub struct Cell {
+  char : Char
+  format : ConsoleFormat
+} derive(Eq)
+pub fn Cell::new(Char, ConsoleFormat) -> Self
+pub fn Cell::op_equal(Self, Self) -> Bool
+pub impl Default for Cell
+
+pub struct ConsoleFormat {
+  foreground : AnsiColor
+  background : AnsiColor
+  bold : Bool
+  italic : Bool
+  underline : Bool
+} derive(Eq)
+pub fn ConsoleFormat::new(foreground? : AnsiColor, background? : AnsiColor, bold? : Bool, italic? : Bool, underline? : Bool) -> Self
+pub fn ConsoleFormat::with_background(Self, AnsiColor) -> Self
+pub impl Default for ConsoleFormat
+
+pub struct FormatSpan {
+  start : Int
+  length : Int
+  format : ConsoleFormat
+}
+pub fn FormatSpan::new(Int, Int, ConsoleFormat) -> Self
+
+pub struct FormattedString {
+  text : String
+  spans : Array[FormatSpan]
+}
+pub fn FormattedString::new(String, spans? : Array[FormatSpan]) -> Self
+pub fn FormattedString::width(Self) -> Int
+
+pub struct Screen {
+  rows : Array[Array[Cell]]
+  width : Int
+  height : Int
+  mut cursor_row : Int
+  mut cursor_col : Int
+}
+pub fn Screen::draw_string(Self, Int, Int, String, ConsoleFormat) -> Unit
+pub fn Screen::new(Int, Int) -> Self
+pub fn Screen::set_cursor(Self, Int, Int) -> Unit
+
+pub struct WrappedText {
+  lines : Array[String]
+  cursor_row : Int
+  cursor_col : Int
+}
+
+// Type aliases
+
+// Traits
+

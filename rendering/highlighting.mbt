@@ -31,6 +31,14 @@ pub struct ConsoleFormat {
 } derive(Eq)
 
 ///|
+pub fn ConsoleFormat::with_background(
+  self : ConsoleFormat,
+  background : AnsiColor,
+) -> ConsoleFormat {
+  { ..self, background, }
+}
+
+///|
 pub impl Default for ConsoleFormat with default() {
   {
     foreground: Default,

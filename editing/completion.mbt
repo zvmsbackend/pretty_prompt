@@ -59,6 +59,14 @@ pub fn OverloadState::new(items : Array[OverloadItem]) -> OverloadState {
 }
 
 ///|
+pub fn OverloadState::set_selected_index(
+  self : OverloadState,
+  selected_index : Int,
+) -> Unit {
+  self.selected_index = selected_index
+}
+
+///|
 /// (保持之前的 CompletionItem::get_priority, CompletionState::new, CompletionState::filter 不变)
 pub fn CompletionItem::get_priority(
   self : CompletionItem,
@@ -102,6 +110,14 @@ pub fn CompletionState::new(
   }
   state.filter(filter_prefix)
   state
+}
+
+///|
+pub fn CompletionState::set_selected_index(
+  self : CompletionState,
+  selected_index : Int,
+) -> Unit {
+  self.selected_index = selected_index
 }
 
 ///|

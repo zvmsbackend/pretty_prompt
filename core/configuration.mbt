@@ -1,4 +1,10 @@
 ///|
+using @rendering {type AnsiColor}
+
+///|
+using @editing {type HistoryConfiguration, type CompletionItem}
+
+///|
 struct KeyPressPattern {
   key : @console.ConsoleKey
   shift : Bool

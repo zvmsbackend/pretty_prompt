@@ -1,4 +1,7 @@
 ///|
+using @ports {trait ConsolePort, trait ClipboardPort, type ClipboardPortError}
+
+///|
 struct SystemConsolePort {}
 
 ///|
