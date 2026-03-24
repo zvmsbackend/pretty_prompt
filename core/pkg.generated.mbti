@@ -84,8 +84,8 @@ pub struct PromptConfiguration {
   max_completion_items_count : Int
   kill_ring_max_size : Int
 }
-pub fn PromptConfiguration::default() -> Self
 pub fn PromptConfiguration::new(prompt? : @rendering.FormattedString, key_bindings? : KeyBindings, history? : @editing.HistoryConfiguration, highlighter? : async (String) -> Array[@rendering.FormatSpan], completer? : async (String, Int) -> Array[@editing.CompletionItem], overload_provider? : async (String, Int) -> Array[@editing.OverloadItem], selection_background? : @rendering.AnsiColor, use_colors? : Bool, max_completion_items_count? : Int, kill_ring_max_size? : Int) -> Self
+pub impl Default for PromptConfiguration
 
 pub struct PromptResult {
   is_success : Bool

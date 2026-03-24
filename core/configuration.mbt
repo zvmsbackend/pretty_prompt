@@ -102,201 +102,189 @@ pub struct KeyBindings {
 }
 
 ///|
-fn default_submit_prompt_patterns() -> KeyPressPatterns {
-  KeyPressPatterns::new([
-    KeyPressPattern::new(Enter),
-    KeyPressPattern::new(Enter, control=true),
-    KeyPressPattern::new(Enter, alt=true, control=true),
-  ])
-}
+let default_submit_prompt_patterns : KeyPressPatterns = KeyPressPatterns::new([
+  KeyPressPattern::new(Enter),
+  KeyPressPattern::new(Enter, control=true),
+  KeyPressPattern::new(Enter, alt=true, control=true),
+])
 
 ///|
-fn default_cancel_prompt_patterns() -> KeyPressPatterns {
-  KeyPressPatterns::single(KeyPressPattern::new(C, control=true))
-}
+let default_cancel_prompt_patterns : KeyPressPatterns = KeyPressPatterns::single(
+  KeyPressPattern::new(C, control=true),
+)
 
 ///|
-fn default_backward_delete_character_patterns() -> KeyPressPatterns {
-  @console.Backspace |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_backward_delete_character_patterns : KeyPressPatterns = @console.Backspace
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_history_previous_patterns() -> KeyPressPatterns {
-  @console.UpArrow |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_history_previous_patterns : KeyPressPatterns = @console.UpArrow
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_history_next_patterns() -> KeyPressPatterns {
-  @console.DownArrow |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_history_next_patterns : KeyPressPatterns = @console.DownArrow
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_delete_character_patterns() -> KeyPressPatterns {
-  @console.Delete |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_delete_character_patterns : KeyPressPatterns = @console.Delete
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_move_left_patterns() -> KeyPressPatterns {
-  @console.LeftArrow |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_move_left_patterns : KeyPressPatterns = @console.LeftArrow
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_move_right_patterns() -> KeyPressPatterns {
-  @console.RightArrow |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_move_right_patterns : KeyPressPatterns = @console.RightArrow
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_move_home_patterns() -> KeyPressPatterns {
-  @console.Home |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_move_home_patterns : KeyPressPatterns = @console.Home
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_move_end_patterns() -> KeyPressPatterns {
-  @console.End |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_move_end_patterns : KeyPressPatterns = @console.End
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_move_word_left_patterns() -> KeyPressPatterns {
-  KeyPressPatterns::new([
-    KeyPressPattern::new(LeftArrow, control=true),
-    KeyPressPattern::new(B, alt=true),
-  ])
-}
+let default_move_word_left_patterns : KeyPressPatterns = KeyPressPatterns::new([
+  KeyPressPattern::new(LeftArrow, control=true),
+  KeyPressPattern::new(B, alt=true),
+])
 
 ///|
-fn default_move_word_right_patterns() -> KeyPressPatterns {
-  KeyPressPatterns::new([
+let default_move_word_right_patterns : KeyPressPatterns = KeyPressPatterns::new([
     KeyPressPattern::new(RightArrow, control=true),
     KeyPressPattern::new(F, alt=true),
-  ])
-}
+  ],
+)
 
 ///|
-fn default_backward_delete_word_patterns() -> KeyPressPatterns {
-  KeyPressPatterns::new([
+let default_backward_delete_word_patterns : KeyPressPatterns = KeyPressPatterns::new([
     KeyPressPattern::new(W, control=true),
     KeyPressPattern::new(Backspace, alt=true),
-  ])
-}
+  ],
+)
 
 ///|
-fn default_delete_word_patterns() -> KeyPressPatterns {
-  KeyPressPatterns::new([
-    KeyPressPattern::new(D, alt=true),
-    KeyPressPattern::new(Delete, control=true),
-  ])
-}
+let default_delete_word_patterns : KeyPressPatterns = KeyPressPatterns::new([
+  KeyPressPattern::new(D, alt=true),
+  KeyPressPattern::new(Delete, control=true),
+])
 
 ///|
-fn default_trigger_completion_patterns() -> KeyPressPatterns {
-  @console.Tab |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_trigger_completion_patterns : KeyPressPatterns = @console.Tab
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_dismiss_completion_patterns() -> KeyPressPatterns {
-  @console.Escape |> KeyPressPattern::new |> KeyPressPatterns::single
-}
+let default_dismiss_completion_patterns : KeyPressPatterns = @console.Escape
+  |> KeyPressPattern::new
+  |> KeyPressPatterns::single
 
 ///|
-fn default_undo_patterns() -> KeyPressPatterns {
-  @console.Z |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
-}
+let default_undo_patterns : KeyPressPatterns = @console.Z
+  |> KeyPressPattern::new(control=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_redo_patterns() -> KeyPressPatterns {
-  @console.Y |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
-}
+let default_redo_patterns : KeyPressPatterns = @console.Y
+  |> KeyPressPattern::new(control=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_move_left_selection_patterns() -> KeyPressPatterns {
-  @console.LeftArrow
+let default_move_left_selection_patterns : KeyPressPatterns = @console.LeftArrow
   |> KeyPressPattern::new(shift=true)
   |> KeyPressPatterns::single
-}
 
 ///|
-fn default_move_right_selection_patterns() -> KeyPressPatterns {
-  @console.RightArrow
+let default_move_right_selection_patterns : KeyPressPatterns = @console.RightArrow
   |> KeyPressPattern::new(shift=true)
   |> KeyPressPatterns::single
-}
 
 ///|
-fn default_move_home_selection_patterns() -> KeyPressPatterns {
-  @console.Home |> KeyPressPattern::new(shift=true) |> KeyPressPatterns::single
-}
+let default_move_home_selection_patterns : KeyPressPatterns = @console.Home
+  |> KeyPressPattern::new(shift=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_move_end_selection_patterns() -> KeyPressPatterns {
-  @console.End |> KeyPressPattern::new(shift=true) |> KeyPressPatterns::single
-}
+let default_move_end_selection_patterns : KeyPressPatterns = @console.End
+  |> KeyPressPattern::new(shift=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_copy_selection_patterns() -> KeyPressPatterns {
-  @console.C |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
-}
+let default_copy_selection_patterns : KeyPressPatterns = @console.C
+  |> KeyPressPattern::new(control=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_cut_selection_patterns() -> KeyPressPatterns {
-  @console.X |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
-}
+let default_cut_selection_patterns : KeyPressPatterns = @console.X
+  |> KeyPressPattern::new(control=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_kill_line_tail_patterns() -> KeyPressPatterns {
-  @console.K |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
-}
+let default_kill_line_tail_patterns : KeyPressPatterns = @console.K
+  |> KeyPressPattern::new(control=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_kill_line_head_patterns() -> KeyPressPatterns {
-  @console.U |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
-}
+let default_kill_line_head_patterns : KeyPressPatterns = @console.U
+  |> KeyPressPattern::new(control=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_yank_patterns() -> KeyPressPatterns {
-  @console.Y |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
-}
+let default_yank_patterns : KeyPressPatterns = @console.Y
+  |> KeyPressPattern::new(control=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_yank_pop_patterns() -> KeyPressPatterns {
-  @console.Y |> KeyPressPattern::new(alt=true) |> KeyPressPatterns::single
-}
+let default_yank_pop_patterns : KeyPressPatterns = @console.Y
+  |> KeyPressPattern::new(alt=true)
+  |> KeyPressPatterns::single
 
 ///|
-fn default_reverse_search_patterns() -> KeyPressPatterns {
-  @console.R |> KeyPressPattern::new(control=true) |> KeyPressPatterns::single
-}
+let default_reverse_search_patterns : KeyPressPatterns = @console.R
+  |> KeyPressPattern::new(control=true)
+  |> KeyPressPatterns::single
 
 ///|
 pub fn KeyBindings::new(
-  submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns(),
-  cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns(),
-  history_previous? : KeyPressPatterns = default_history_previous_patterns(),
-  history_next? : KeyPressPatterns = default_history_next_patterns(),
-  backward_delete_character? : KeyPressPatterns = default_backward_delete_character_patterns(),
-  delete_character? : KeyPressPatterns = default_delete_character_patterns(),
-  move_left? : KeyPressPatterns = default_move_left_patterns(),
-  move_right? : KeyPressPatterns = default_move_right_patterns(),
-  move_home? : KeyPressPatterns = default_move_home_patterns(),
-  move_end? : KeyPressPatterns = default_move_end_patterns(),
-  move_word_left? : KeyPressPatterns = default_move_word_left_patterns(),
-  move_word_right? : KeyPressPatterns = default_move_word_right_patterns(),
-  backward_delete_word? : KeyPressPatterns = default_backward_delete_word_patterns(),
-  delete_word? : KeyPressPatterns = default_delete_word_patterns(),
-  trigger_completion? : KeyPressPatterns = default_trigger_completion_patterns(),
-  dismiss_completion? : KeyPressPatterns = default_dismiss_completion_patterns(),
-  undo? : KeyPressPatterns = default_undo_patterns(),
-  redo? : KeyPressPatterns = default_redo_patterns(),
-  move_left_selection? : KeyPressPatterns = default_move_left_selection_patterns(),
-  move_right_selection? : KeyPressPatterns = default_move_right_selection_patterns(),
-  move_home_selection? : KeyPressPatterns = default_move_home_selection_patterns(),
-  move_end_selection? : KeyPressPatterns = default_move_end_selection_patterns(),
-  copy_selection? : KeyPressPatterns = default_copy_selection_patterns(),
-  cut_selection? : KeyPressPatterns = default_cut_selection_patterns(),
-  kill_line_tail? : KeyPressPatterns = default_kill_line_tail_patterns(),
-  kill_line_head? : KeyPressPatterns = default_kill_line_head_patterns(),
-  yank? : KeyPressPatterns = default_yank_patterns(),
-  yank_pop? : KeyPressPatterns = default_yank_pop_patterns(),
-  reverse_search? : KeyPressPatterns = default_reverse_search_patterns(),
+  submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns,
+  cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns,
+  history_previous? : KeyPressPatterns = default_history_previous_patterns,
+  history_next? : KeyPressPatterns = default_history_next_patterns,
+  backward_delete_character? : KeyPressPatterns = default_backward_delete_character_patterns,
+  delete_character? : KeyPressPatterns = default_delete_character_patterns,
+  move_left? : KeyPressPatterns = default_move_left_patterns,
+  move_right? : KeyPressPatterns = default_move_right_patterns,
+  move_home? : KeyPressPatterns = default_move_home_patterns,
+  move_end? : KeyPressPatterns = default_move_end_patterns,
+  move_word_left? : KeyPressPatterns = default_move_word_left_patterns,
+  move_word_right? : KeyPressPatterns = default_move_word_right_patterns,
+  backward_delete_word? : KeyPressPatterns = default_backward_delete_word_patterns,
+  delete_word? : KeyPressPatterns = default_delete_word_patterns,
+  trigger_completion? : KeyPressPatterns = default_trigger_completion_patterns,
+  dismiss_completion? : KeyPressPatterns = default_dismiss_completion_patterns,
+  undo? : KeyPressPatterns = default_undo_patterns,
+  redo? : KeyPressPatterns = default_redo_patterns,
+  move_left_selection? : KeyPressPatterns = default_move_left_selection_patterns,
+  move_right_selection? : KeyPressPatterns = default_move_right_selection_patterns,
+  move_home_selection? : KeyPressPatterns = default_move_home_selection_patterns,
+  move_end_selection? : KeyPressPatterns = default_move_end_selection_patterns,
+  copy_selection? : KeyPressPatterns = default_copy_selection_patterns,
+  cut_selection? : KeyPressPatterns = default_cut_selection_patterns,
+  kill_line_tail? : KeyPressPatterns = default_kill_line_tail_patterns,
+  kill_line_head? : KeyPressPatterns = default_kill_line_head_patterns,
+  yank? : KeyPressPatterns = default_yank_patterns,
+  yank_pop? : KeyPressPatterns = default_yank_pop_patterns,
+  reverse_search? : KeyPressPatterns = default_reverse_search_patterns,
 ) -> KeyBindings {
   {
     submit_prompt,
@@ -378,6 +366,6 @@ pub fn PromptConfiguration::new(
 }
 
 ///|
-pub fn PromptConfiguration::default() -> PromptConfiguration {
+pub impl Default for PromptConfiguration with default() {
   PromptConfiguration::new()
 }

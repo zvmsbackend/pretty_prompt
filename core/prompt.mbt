@@ -126,7 +126,7 @@ async fn Prompt::process_key_press(
   key_press : KeyPress,
 ) -> KeyProcessingResult {
   let info = key_press.console_key_info
-  if is_control_c_key(info) {
+  if key_bindings.cancel_prompt.matches(info) || is_control_c_key(info) {
     return Return(self.cancel_prompt(info))
   }
 
@@ -341,6 +341,96 @@ fn Prompt::delete_selection(
     }
     self.pane_state.selection = None
   }
+}
+
+///|
+fn Prompt::move_word_left(
+  _self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+) -> Bool {
+  let mut moved = false
+  while left.length() > 0 && !is_word_character(left[left.length() - 1]) {
+    if left.pop() is Some(ch) {
+      right.push(ch)
+      moved = true
+    }
+  }
+  while left.length() > 0 && is_word_character(left[left.length() - 1]) {
+    if left.pop() is Some(ch) {
+      right.push(ch)
+      moved = true
+    }
+  }
+  moved
+}
+
+///|
+fn Prompt::move_word_right(
+  _self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+) -> Bool {
+  let mut moved = false
+  while right.length() > 0 && !is_word_character(right[right.length() - 1]) {
+    if right.pop() is Some(ch) {
+      left.push(ch)
+      moved = true
+    }
+  }
+  while right.length() > 0 && is_word_character(right[right.length() - 1]) {
+    if right.pop() is Some(ch) {
+      left.push(ch)
+      moved = true
+    }
+  }
+  moved
+}
+
+///|
+fn Prompt::delete_word_left(
+  self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+) -> Bool {
+  if self.pane_state.selection is Some(_) {
+    self.delete_selection(left, right)
+    return true
+  }
+
+  let mut deleted = false
+  while left.length() > 0 && !is_word_character(left[left.length() - 1]) {
+    ignore(left.pop())
+    deleted = true
+  }
+  while left.length() > 0 && is_word_character(left[left.length() - 1]) {
+    ignore(left.pop())
+    deleted = true
+  }
+  deleted
+}
+
+///|
+fn Prompt::delete_word_right(
+  self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+) -> Bool {
+  if self.pane_state.selection is Some(_) {
+    self.delete_selection(left, right)
+    return true
+  }
+
+  let mut deleted = false
+  while right.length() > 0 && !is_word_character(right[right.length() - 1]) {
+    ignore(right.pop())
+    deleted = true
+  }
+  while right.length() > 0 && is_word_character(right[right.length() - 1]) {
+    ignore(right.pop())
+    deleted = true
+  }
+  deleted
 }
 
 ///|

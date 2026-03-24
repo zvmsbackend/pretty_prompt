@@ -155,6 +155,43 @@ fn Prompt::run_edit_keys_handler(
   key_bindings : KeyBindings,
   info : @console.ConsoleKeyInfo,
 ) -> KeyProcessingResult {
+  if key_bindings.backward_delete_word.matches(info) {
+    self.pane_state.selection = None
+    if self.delete_word_left(state.left, state.right) {
+      if self.pane_state.completion_state is Some(completion_state) {
+        update_completion_filter(completion_state, state.left)
+      }
+      self.track_undo(state.left, state.right)
+      state.request_render()
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.delete_word.matches(info) {
+    self.pane_state.selection = None
+    if self.delete_word_right(state.left, state.right) {
+      self.track_undo(state.left, state.right)
+      state.request_render()
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_word_left.matches(info) {
+    self.pane_state.selection = None
+    if self.move_word_left(state.left, state.right) {
+      state.request_render()
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_word_right.matches(info) {
+    self.pane_state.selection = None
+    if self.move_word_right(state.left, state.right) {
+      state.request_render()
+    }
+    state.last_was_yank = false
+    return Handled
+  }
   if key_bindings.backward_delete_character.matches(info) {
     if self.pane_state.selection is Some(_) {
       self.delete_selection(state.left, state.right)

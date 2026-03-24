@@ -534,6 +534,73 @@ async test "prompt read_line supports home and end" {
 }
 
 ///|
+async test "prompt read_line supports move word left and right" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key(' ', @console.A),
+    key('c', @console.C),
+    key('d', @console.D),
+    key('\u0000', @console.LeftArrow, control=true),
+    key('X', @console.X),
+    key('\u0000', @console.RightArrow, control=true),
+    key('Y', @console.Y),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line_with_prompt(FormattedString::new("> "))
+  assert_true(result.is_success)
+  assert_eq(result.text, "ab XcdY")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt read_line supports backward delete word" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key(' ', @console.A),
+    key('c', @console.C),
+    key('d', @console.D),
+    key('\u0017', @console.W, control=true),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line_with_prompt(FormattedString::new("> "))
+  assert_true(result.is_success)
+  assert_eq(result.text, "ab ")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt read_line supports delete word" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key(' ', @console.A),
+    key('c', @console.C),
+    key('d', @console.D),
+    key('\u0000', @console.Home),
+    key('\u0000', @console.Delete, control=true),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line_with_prompt(FormattedString::new("> "))
+  assert_true(result.is_success)
+  assert_eq(result.text, " cd")
+
+  prompt.dispose()
+}
+
+///|
 async test "prompt read_line returns cancelled on ctrl c" {
   let console = FakeInputConsole::new([key('\u0003', @console.C, control=true)])
   let clipboard = FakeClipboard::new("")
@@ -544,6 +611,26 @@ async test "prompt read_line returns cancelled on ctrl c" {
   assert_eq(result.text, "")
   assert_eq(result.submit_key_info.key, @console.C)
   assert_eq(result.submit_key_info.control, true)
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt read_line uses custom cancel key binding" {
+  let console = FakeInputConsole::new([key('\u000c', @console.L, control=true)])
+  let clipboard = FakeClipboard::new("")
+  let cancel = @pretty_prompt.KeyPressPatterns::single(
+    @pretty_prompt.KeyPressPattern::new(@console.L, control=true),
+  )
+  let key_bindings = @pretty_prompt.KeyBindings::new(cancel_prompt=cancel)
+  let configuration = @pretty_prompt.PromptConfiguration::new(key_bindings~)
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard, configuration~)
+
+  let result = prompt.read_line_with_prompt(FormattedString::new("$ "))
+  assert_false(result.is_success)
+  assert_eq(result.text, "")
+  assert_eq(result.submit_key_info.key, @console.L)
+  assert_true(result.submit_key_info.control)
 
   prompt.dispose()
 }
