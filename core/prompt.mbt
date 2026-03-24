@@ -54,6 +54,7 @@ struct Prompt {
   cancel_controller : CancelController
   mut pane_state : PaneState
   mut last_screen : Screen?
+  mut render_anchor : (Int, Int)?
   undo_manager : UndoManager
   kill_ring : KillRing
 }
@@ -75,6 +76,7 @@ pub async fn Prompt::new(
     cancel_controller,
     pane_state: PaneState::new(),
     last_screen: None,
+    render_anchor: None,
     undo_manager: UndoManager::new("", 0),
     kill_ring: KillRing::new(max_size=configuration.kill_ring_max_size),
   }
@@ -92,6 +94,8 @@ pub async fn Prompt::read_line_with_prompt(
 ) -> PromptResult {
   self.cancel_controller.set_mode(CaptureAsInput)
   self.console.write(prompt.text)
+  self.last_screen = None
+  self.render_anchor = None
   let state = InputState::new()
   let key_bindings = self.configuration.key_bindings
 
@@ -675,11 +679,27 @@ async fn Prompt::render_line(
   }
 
   // 6. Render Diff
-  let base_row = self.console.get_cursor_top()
+  let (base_row, base_col) = match self.render_anchor {
+    Some(anchor) => anchor
+    None => {
+      let anchor = (
+        self.console.get_cursor_top(),
+        self.console.get_cursor_left(),
+      )
+      self.render_anchor = Some(anchor)
+      anchor
+    }
+  }
   let old_screen_val = self.last_screen.unwrap_or_else(() => {
-    Screen::new(height, width)
+    Screen::new(0, width)
   })
-  render_diff(self.console, new_screen, old_screen_val, base_row, 1)
+  render_diff(
+    self.console,
+    new_screen,
+    old_screen_val,
+    base_row + 1,
+    base_col + 1,
+  )
   self.last_screen = Some(new_screen)
 }
 

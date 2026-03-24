@@ -86,6 +86,29 @@ pub fn Screen::draw_string(
 }
 
 ///|
+fn append_relative_cursor_move(
+  output : Array[String],
+  from_row : Int,
+  from_col : Int,
+  to_row : Int,
+  to_col : Int,
+) -> Unit {
+  let row_delta = to_row - from_row
+  if row_delta < 0 {
+    output.push("\u{1b}[\{-row_delta}A")
+  } else if row_delta > 0 {
+    output.push("\u{1b}[\{row_delta}B")
+  }
+
+  let col_delta = to_col - from_col
+  if col_delta < 0 {
+    output.push("\u{1b}[\{-col_delta}D")
+  } else if col_delta > 0 {
+    output.push("\u{1b}[\{col_delta}C")
+  }
+}
+
+///|
 /// 将新旧屏幕差异输出到控制台
 pub fn render_diff(
   console : &@ports.ConsolePort,
@@ -94,11 +117,20 @@ pub fn render_diff(
   base_row : Int,
   base_col : Int,
 ) -> Unit {
+  let output = Array::new()
   let mut current_format = ConsoleFormat::default()
-  console.write("\u{1b}[0m") // 重置初始样式
+  output.push("\u{1b}[0m") // 重置初始样式
+
+  // 首帧仍用绝对定位建立锚点；后续刷新使用相对移动。
+  let mut cursor_row = old_screen.cursor_row
+  let mut cursor_col = old_screen.cursor_col
+  if old_screen.height == 0 {
+    output.push("\u{1b}[\{base_row};\{base_col}H")
+    cursor_row = 0
+    cursor_col = 0
+  }
 
   for r in 0..<new_screen.height {
-    let mut row_dirty = false
     for c in 0..<new_screen.width {
       let new_cell = new_screen.rows[r][c]
       let old_cell = if r < old_screen.height && c < old_screen.width {
@@ -108,13 +140,13 @@ pub fn render_diff(
       }
 
       if new_cell != old_cell {
-        if !row_dirty {
-          // 定位到该行的起始差异点
-          let target_row = base_row + r
-          let target_col = base_col + c
-          console.write("\u{1b}[\{target_row};\{target_col}H")
-          row_dirty = true
+        if new_cell.char == '\u{0000}' {
+          continue
         }
+
+        append_relative_cursor_move(output, cursor_row, cursor_col, r, c)
+        cursor_row = r
+        cursor_col = c
 
         // 更新样式
         if !(new_cell.format.foreground == current_format.foreground &&
@@ -122,23 +154,26 @@ pub fn render_diff(
           new_cell.format.bold == current_format.bold &&
           new_cell.format.italic == current_format.italic &&
           new_cell.format.underline == current_format.underline) {
-          console.write("\u{1b}[0m") // 简单处理：先重置再应用新样式
-          console.write(new_cell.format.to_escape_sequence())
+          output.push("\u{1b}[0m") // 简单处理：先重置再应用新样式
+          output.push(new_cell.format.to_escape_sequence())
           current_format = new_cell.format
         }
 
-        if new_cell.char != '\u{0000}' {
-          console.write(new_cell.char.to_string())
-        }
-      } else {
-        row_dirty = false
+        output.push(new_cell.char.to_string())
+        cursor_col = cursor_col + get_char_width(new_cell.char)
       }
     }
   }
 
   // 最后恢复光标位置
-  let final_row = base_row + new_screen.cursor_row
-  let final_col = base_col + new_screen.cursor_col
-  console.write("\u{1b}[\{final_row};\{final_col}H")
-  console.write("\u{1b}[0m")
+  append_relative_cursor_move(
+    output,
+    cursor_row,
+    cursor_col,
+    new_screen.cursor_row,
+    new_screen.cursor_col,
+  )
+  output.push("\u{1b}[0m")
+
+  console.write(output.join(""))
 }

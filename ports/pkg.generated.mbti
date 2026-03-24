@@ -51,6 +51,7 @@ pub(open) trait ConsolePort {
   key_available(Self) -> Bool
   is_error_redirected(Self) -> Bool
   get_cursor_top(Self) -> Int
+  get_cursor_left(Self) -> Int
   get_buffer_width(Self) -> Int
   get_window_height(Self) -> Int
   get_window_top(Self) -> Int

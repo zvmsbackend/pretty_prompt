@@ -1,5 +1,5 @@
 ///|
-using @ports {trait ClipboardPort}
+using @ports {trait ConsolePort, trait ClipboardPort}
 
 ///|
 struct FakeConsole {
@@ -35,102 +35,92 @@ fn FakeConsole::trigger_cancel(
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with read_key(self, _intercept) {
-  self |> ignore
+impl ConsolePort for FakeConsole with read_key(_self, _intercept) {
   @console.ConsoleKeyInfo::new('\n', @console.Enter, false, false, false)
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with key_available(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with key_available(_self) {
   false
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with is_error_redirected(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with is_error_redirected(_self) {
   false
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with get_cursor_top(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with get_cursor_top(_self) {
   0
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with get_buffer_width(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with get_cursor_left(_self) {
+  0
+}
+
+///|
+impl ConsolePort for FakeConsole with get_buffer_width(_self) {
   80
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with get_window_height(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with get_window_height(_self) {
   25
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with get_window_top(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with get_window_top(_self) {
   0
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with write(self, _value) {
+impl ConsolePort for FakeConsole with write(self, _value) {
   self.write_calls = self.write_calls + 1
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with write_line(self, _value) {
+impl ConsolePort for FakeConsole with write_line(self, _value) {
   self.write_calls = self.write_calls + 1
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with write_error(self, _value) {
+impl ConsolePort for FakeConsole with write_error(self, _value) {
   self.write_calls = self.write_calls + 1
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with write_error_line(
-  self,
-  _value,
-) {
+impl ConsolePort for FakeConsole with write_error_line(self, _value) {
   self.write_calls = self.write_calls + 1
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with clear(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with clear(_self) {
+
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with show_cursor(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with show_cursor(_self) {
+
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with hide_cursor(self) {
-  self |> ignore
+impl ConsolePort for FakeConsole with hide_cursor(_self) {
+
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with get_treat_control_c_as_input(
-  self,
-) {
+impl ConsolePort for FakeConsole with get_treat_control_c_as_input(self) {
   self.treat_control_c_as_input
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with set_treat_control_c_as_input(
-  self,
-  value,
-) {
+impl ConsolePort for FakeConsole with set_treat_control_c_as_input(self, value) {
   self.treat_control_c_as_input = value
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with add_cancel_key_press_handler(
+impl ConsolePort for FakeConsole with add_cancel_key_press_handler(
   self,
   handler,
 ) {
@@ -142,10 +132,7 @@ impl @pretty_prompt.ConsolePort for FakeConsole with add_cancel_key_press_handle
 }
 
 ///|
-impl @pretty_prompt.ConsolePort for FakeConsole with remove_cancel_key_press_handler(
-  self,
-  id,
-) {
+impl ConsolePort for FakeConsole with remove_cancel_key_press_handler(self, id) {
   self.removed_handler_id = Some(id)
   self.last_handler = None
 }
@@ -252,10 +239,7 @@ fn key(
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with read_key(
-  self,
-  _intercept,
-) {
+pub impl ConsolePort for FakeInputConsole with read_key(self, _intercept) {
   if self.index >= self.keys.length() {
     return key('\n', @console.Enter)
   }
@@ -265,105 +249,84 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with read_key(
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with key_available(
-  self,
-) {
+pub impl ConsolePort for FakeInputConsole with key_available(self) {
   self.batch_all && self.index < self.keys.length()
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with is_error_redirected(
-  self,
-) {
-  self |> ignore
+pub impl ConsolePort for FakeInputConsole with is_error_redirected(_self) {
   false
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_cursor_top(
-  self,
-) {
-  self |> ignore
+pub impl ConsolePort for FakeInputConsole with get_cursor_top(_self) {
   0
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_buffer_width(
-  self,
-) {
-  self |> ignore
+pub impl ConsolePort for FakeInputConsole with get_cursor_left(_self) {
+  0
+}
+
+///|
+pub impl ConsolePort for FakeInputConsole with get_buffer_width(_self) {
   80
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_window_height(
-  self,
-) {
-  self |> ignore
+pub impl ConsolePort for FakeInputConsole with get_window_height(_self) {
   24
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_window_top(
-  self,
-) {
-  self |> ignore
+pub impl ConsolePort for FakeInputConsole with get_window_top(_self) {
   0
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write(self, value) {
+pub impl ConsolePort for FakeInputConsole with write(self, value) {
   self.output = "\{self.output}\{value}"
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_line(
-  self,
-  value,
-) {
+pub impl ConsolePort for FakeInputConsole with write_line(self, value) {
   self.output = "\{self.output}\{value}\n"
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_error(
-  self,
-  value,
-) {
+pub impl ConsolePort for FakeInputConsole with write_error(self, value) {
   self.output = "\{self.output}\{value}"
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with write_error_line(
-  self,
-  value,
-) {
+pub impl ConsolePort for FakeInputConsole with write_error_line(self, value) {
   self.output = "\{self.output}\{value}\n"
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with clear(self) {
-  self |> ignore
+pub impl ConsolePort for FakeInputConsole with clear(_self) {
+
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with show_cursor(self) {
-  self |> ignore
+pub impl ConsolePort for FakeInputConsole with show_cursor(_self) {
+
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with hide_cursor(self) {
-  self |> ignore
+pub impl ConsolePort for FakeInputConsole with hide_cursor(_self) {
+
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with get_treat_control_c_as_input(
+pub impl ConsolePort for FakeInputConsole with get_treat_control_c_as_input(
   self,
 ) {
   self.treat_control_c_as_input
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with set_treat_control_c_as_input(
+pub impl ConsolePort for FakeInputConsole with set_treat_control_c_as_input(
   self,
   value,
 ) {
@@ -371,7 +334,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with set_treat_control_
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with add_cancel_key_press_handler(
+pub impl ConsolePort for FakeInputConsole with add_cancel_key_press_handler(
   self,
   _handler,
 ) {
@@ -381,7 +344,7 @@ pub impl @pretty_prompt.ConsolePort for FakeInputConsole with add_cancel_key_pre
 }
 
 ///|
-pub impl @pretty_prompt.ConsolePort for FakeInputConsole with remove_cancel_key_press_handler(
+pub impl ConsolePort for FakeInputConsole with remove_cancel_key_press_handler(
   self,
   id,
 ) {

@@ -30,6 +30,11 @@ pub impl ConsolePort for SystemConsolePort with get_cursor_top(_self) {
 }
 
 ///|
+pub impl ConsolePort for SystemConsolePort with get_cursor_left(_self) {
+  @console.get_cursor_left()
+}
+
+///|
 pub impl ConsolePort for SystemConsolePort with get_buffer_width(_self) {
   @console.get_buffer_width()
 }
