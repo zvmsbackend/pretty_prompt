@@ -59,12 +59,22 @@ pub async fn Prompt::read_line_with_prompt(
   while true {
     if self.cancel_controller.take_cancellation_requested() {
       self.console.write_line("")
+      self.cancel_controller.set_mode(AllowCancelSignal)
       return cancel_result()
     }
 
     let key_presses = read_key_presses(self.console)
     for key_press in key_presses {
       let info = key_press.console_key_info
+
+      if is_control_c_key(info) {
+        self.completion_state = None
+        self.overload_state = None
+        self.selection = None
+        self.console.write_line("")
+        self.cancel_controller.set_mode(AllowCancelSignal)
+        return PromptResult::cancelled(info)
+      }
 
       if key_press.pasted_text is Some(pasted) {
         self.completion_state = None
@@ -357,6 +367,15 @@ pub async fn Prompt::read_line_with_prompt(
 
       self.history.reset_navigation()
 
+      if key_bindings.cancel_prompt.matches(info) || is_control_c_key(info) {
+        self.completion_state = None
+        self.overload_state = None
+        self.selection = None
+        self.console.write_line("")
+        self.cancel_controller.set_mode(AllowCancelSignal)
+        return PromptResult::cancelled(info)
+      }
+
       if key_bindings.submit_prompt.matches(info) {
         self.completion_state = None
         self.overload_state = None
@@ -572,6 +591,11 @@ fn update_completion_filter(
 ///|
 fn is_word_character(ch : Char) -> Bool {
   ch.is_ascii_alphabetic() || ch.is_ascii_digit() || ch == '_'
+}
+
+///|
+fn is_control_c_key(info : @console.ConsoleKeyInfo) -> Bool {
+  (info.key is C && info.control) || (info.key_char == '\u0003' && info.control)
 }
 
 ///|
