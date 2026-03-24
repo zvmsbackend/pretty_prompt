@@ -22,9 +22,9 @@ pub fn HistoryConfiguration::default() -> HistoryConfiguration {
 pub struct HistoryLog {
   entries : Array[String]
   config : HistoryConfiguration
-  navigation_index : Ref[Int?]
-  unsubmitted_buffer : Ref[String]
-  submissions_since_last_trim : Ref[Int]
+  mut navigation_index : Int?
+  mut unsubmitted_buffer : String
+  mut submissions_since_last_trim : Int
 }
 
 ///|
@@ -32,9 +32,9 @@ pub fn HistoryLog::new(config : HistoryConfiguration) -> HistoryLog {
   {
     entries: [],
     config,
-    navigation_index: @ref.new(None),
-    unsubmitted_buffer: @ref.new(""),
-    submissions_since_last_trim: @ref.new(0),
+    navigation_index: None,
+    unsubmitted_buffer: "",
+    submissions_since_last_trim: 0
   }
 }
 
@@ -72,51 +72,51 @@ pub fn HistoryLog::navigate_previous(
     return None
   }
 
-  if self.navigation_index.val is None {
-    self.unsubmitted_buffer.val = current_buffer
+  if self.navigation_index is None {
+    self.unsubmitted_buffer = current_buffer
   }
-  let pattern = self.unsubmitted_buffer.val
+  let pattern = self.unsubmitted_buffer
 
-  let start = match self.navigation_index.val {
+  let start = match self.navigation_index {
     Some(index) => if index > 0 { index - 1 } else { 0 }
     None => self.entries.length() - 1
   }
 
   find_previous_matching_index(self.entries, pattern, start).bind(index => {
-    self.navigation_index.val = Some(index)
+    self.navigation_index = Some(index)
     Some(self.entries[index])
   })
 }
 
 ///|
 pub fn HistoryLog::navigate_next(self : HistoryLog) -> String? {
-  let current_index = match self.navigation_index.val {
+  let current_index = match self.navigation_index {
     Some(index) => index
     None => return None
   }
 
-  let pattern = self.unsubmitted_buffer.val
+  let pattern = self.unsubmitted_buffer
 
   if current_index + 1 >= self.entries.length() {
-    self.navigation_index.val = None
-    return Some(self.unsubmitted_buffer.val)
+    self.navigation_index = None
+    return Some(self.unsubmitted_buffer)
   }
 
   match find_next_matching_index(self.entries, pattern, current_index + 1) {
     Some(index) => {
-      self.navigation_index.val = Some(index)
+      self.navigation_index = Some(index)
       Some(self.entries[index])
     }
     None => {
-      self.navigation_index.val = None
-      Some(self.unsubmitted_buffer.val)
+      self.navigation_index = None
+      Some(self.unsubmitted_buffer)
     }
   }
 }
 
 ///|
 pub fn HistoryLog::reset_navigation(self : HistoryLog) -> Unit {
-  self.navigation_index.val = None
+  self.navigation_index = None
 }
 
 ///|
@@ -137,11 +137,11 @@ pub async fn HistoryLog::track_submission(
   trim_entries(self.entries, self.config.max_entries)
   self.append_persistent_history_entry(text)
 
-  self.submissions_since_last_trim.val = self.submissions_since_last_trim.val +
+  self.submissions_since_last_trim = self.submissions_since_last_trim +
     1
-  if self.submissions_since_last_trim.val >= 100 {
+  if self.submissions_since_last_trim >= 100 {
     self.save_persistent_history_full()
-    self.submissions_since_last_trim.val = 0
+    self.submissions_since_last_trim = 0
   }
 }
 

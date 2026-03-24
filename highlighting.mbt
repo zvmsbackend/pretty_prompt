@@ -19,7 +19,7 @@ pub(all) enum AnsiColor {
   BrightWhite
   Color256(Int)
   Rgb(Int, Int, Int)
-}
+} derive(Eq)
 
 ///|
 pub struct ConsoleFormat {
@@ -28,7 +28,7 @@ pub struct ConsoleFormat {
   bold : Bool
   italic : Bool
   underline : Bool
-}
+} derive(Eq)
 
 ///|
 pub fn ConsoleFormat::default() -> ConsoleFormat {

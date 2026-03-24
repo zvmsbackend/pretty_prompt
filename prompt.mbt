@@ -5,7 +5,8 @@ pub struct Prompt {
   configuration : PromptConfiguration
   history : HistoryLog
   cancel_controller : CancelController
-  completion_state : Ref[CompletionState?]
+  mut completion_state : CompletionState?
+  mut last_screen : Screen?
 }
 
 ///|
@@ -23,7 +24,8 @@ pub async fn Prompt::new(
     configuration,
     history,
     cancel_controller,
-    completion_state: @ref.new(None),
+    completion_state: None,
+    last_screen: None,
   }
 }
 
@@ -52,7 +54,7 @@ pub async fn Prompt::read_line_with_prompt(
     let key_presses = read_key_presses(self.console)
     for key_press in key_presses {
       if key_press.pasted_text is Some(pasted) {
-        self.completion_state.val = None
+        self.completion_state = None
         left.push_iter(pasted.iter())
         self.render_line(prompt, left, right)
         continue
@@ -62,16 +64,16 @@ pub async fn Prompt::read_line_with_prompt(
 
       // 1. Check for global/mode-switching keys
       if key_bindings.cancel_prompt.matches(info) {
-        self.completion_state.val = None
+        self.completion_state = None
         self.console.write_line("")
         self.cancel_controller.set_mode(AllowCancelSignal)
         return PromptResult::cancelled(info)
       }
 
       // 2. Handle Completion Mode
-      if self.completion_state.val is Some(state) {
+      if self.completion_state is Some(state) {
         if key_bindings.dismiss_completion.matches(info) {
-          self.completion_state.val = None
+          self.completion_state = None
           self.render_line(prompt, left, right)
           continue
         }
@@ -105,7 +107,7 @@ pub async fn Prompt::read_line_with_prompt(
             ignore(left.pop())
           }
           left.push_iter(item.replacement_text.iter())
-          self.completion_state.val = None
+          self.completion_state = None
           self.render_line(prompt, left, right)
           continue
         }
@@ -116,7 +118,7 @@ pub async fn Prompt::read_line_with_prompt(
         let raw_line = line_from_buffers(left, right)
         let items = (self.configuration.completer)(raw_line, left.length())
         if items.length() > 0 {
-          self.completion_state.val = Some(CompletionState::new(items, ""))
+          self.completion_state = Some(CompletionState::new(items, ""))
           self.render_line(prompt, left, right)
         }
         continue
@@ -124,7 +126,7 @@ pub async fn Prompt::read_line_with_prompt(
 
       // 4. Standard Keys (with completion dismissal)
       if key_bindings.history_previous.matches(info) {
-        self.completion_state.val = None
+        self.completion_state = None
         if self.history.navigate_previous(line_from_buffers(left, right))
           is Some(entry) {
           set_line_buffers(left, right, entry)
@@ -349,53 +351,82 @@ async fn Prompt::render_line(
   left : Array[Char],
   right : Array[Char],
 ) -> Unit {
-  // 1. Render the main line
-  self.console.write("\r")
-  self.console.write(prompt)
+  let width = self.console.get_buffer_width()
+  let completion_items_count = match self.completion_state {
+    Some(state) => if state.items.length() < 5 { state.items.length() } else { 5 }
+    None => 0
+  }
+  let height = 1 + completion_items_count
+  let new_screen = Screen::new(height, width)
+
+  // 1. Draw main line
   let raw_line = line_from_buffers(left, right)
   let spans = (self.configuration.highlighter)(raw_line)
-  let highlighted_line = apply_highlights(raw_line, spans)
-  self.console.write(highlighted_line)
-  self.console.write("\u{1b}[K")
+  new_screen.draw_string(0, 0, prompt, ConsoleFormat::default())
+  let prompt_width = get_string_width(prompt)
 
-  // 2. Render completion list if any
-  let mut lines_down = 0
-  if self.completion_state.val is Some(state) {
+  // Draw highlighted line manually to the screen cells
+  let mut current_col = prompt_width
+  let sorted_spans = spans.copy()
+  sorted_spans.sort_by_key(span => span.start)
+  let chars = raw_line.to_array()
+  let mut current_pos = 0
+  for span in sorted_spans {
+    if span.start >= current_pos {
+      // Before span
+      for i in current_pos..<span.start {
+        new_screen.draw_string(0, current_col, chars[i].to_string(), ConsoleFormat::default())
+        current_col = current_col + get_char_width(chars[i])
+      }
+      // Span
+      let end = @cmp.minimum(span.start + span.length, chars.length())
+      for i in span.start..<end {
+        new_screen.draw_string(0, current_col, chars[i].to_string(), span.format)
+        current_col = current_col + get_char_width(chars[i])
+      }
+      current_pos = end
+    }
+  }
+  // Remaining
+  for i in current_pos..<chars.length() {
+    new_screen.draw_string(0, current_col, chars[i].to_string(), ConsoleFormat::default())
+    current_col = current_col + get_char_width(chars[i])
+  }
+
+  // Set cursor position in screen
+  new_screen.cursor_row = 0
+  new_screen.cursor_col = prompt_width + get_chars_width(left.iter())
+
+  // 2. Draw completion menu
+  if self.completion_state is Some(state) {
     let start = if state.selected_index < 2 {
       0
     } else {
       state.selected_index - 2
     }
-    let end = if start + 5 > state.items.length() {
-      state.items.length()
-    } else {
-      start + 5
-    }
-    for i in start..<end {
-      let item = state.items[i]
-      self.console.write("\n\r")
-      lines_down = lines_down + 1
-      if i == state.selected_index {
-        self.console.write("\u{1b}[7m> \{item.display_text}\u{1b}[0m")
-      } else {
-        self.console.write("  \{item.display_text}")
+    for i in 0..<completion_items_count {
+      let item_index = start + i
+      if item_index >= state.items.length() {
+        break
       }
-      self.console.write("\u{1b}[K")
-    }
-    // Return to main line
-    if lines_down > 0 {
-      self.console.write("\u{1b}[\{lines_down}A")
+      let item = state.items[item_index]
+      let row = 1 + i
+      if item_index == state.selected_index {
+        new_screen.draw_string(row, 0, "> \{item.display_text}", ConsoleFormat::new(bold=true, underline=true))
+      } else {
+        new_screen.draw_string(row, 2, item.display_text, ConsoleFormat::default())
+      }
     }
   }
 
-  // 3. Position the cursor correctly at the edit point
-  self.console.write("\r")
-  let prompt_width = get_string_width(prompt)
-  let left_width = get_chars_width(left.iter())
-  let total_move_right = prompt_width + left_width
-  if total_move_right > 0 {
-    self.console.write("\u{1b}[\{total_move_right}C")
+  // 3. Render Diff
+  let base_row = self.console.get_cursor_top()
+  let old_screen_val = match self.last_screen {
+    Some(s) => s
+    None => Screen::new(height, width)
   }
+  render_diff(self.console, new_screen, old_screen_val, base_row, 1)
+  self.last_screen = Some(new_screen)
 }
 
 ///|
