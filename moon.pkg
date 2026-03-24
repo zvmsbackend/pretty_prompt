@@ -10,7 +10,3 @@ import {
   "moonbitlang/async/fs",
   "sennenki/console",
 } for "test"
-
-import {
-  "sennenki/console",
-} for "wbtest"

@@ -397,6 +397,17 @@ test "read_key_presses keeps control burst as key presses" {
 }
 
 ///|
+test "key press patterns empty and has_any" {
+  let empty = @pretty_prompt.KeyPressPatterns::empty()
+  assert_false(empty.has_any())
+
+  let single = @pretty_prompt.KeyPressPatterns::single(
+    @pretty_prompt.KeyPressPattern::new(@console.A),
+  )
+  assert_true(single.has_any())
+}
+
+///|
 async test "prompt read_line submits typed text" {
   let console = FakeInputConsole::new([
     key('h', @console.H),
@@ -720,4 +731,535 @@ async test "prompt persistent history is loaded across prompt instances" {
   @fs.remove(history_path) catch {
     _ => ()
   }
+}
+
+///|
+async test "prompt copy and cut selection with custom bindings" {
+  let copy = @pretty_prompt.KeyPressPatterns::single(
+    @pretty_prompt.KeyPressPattern::new(@console.Q, control=true),
+  )
+  let cut = @pretty_prompt.KeyPressPatterns::single(
+    @pretty_prompt.KeyPressPattern::new(@console.E, control=true),
+  )
+  let key_bindings = @pretty_prompt.KeyBindings::new(
+    copy_selection=copy,
+    cut_selection=cut,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(key_bindings~)
+
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('c', @console.C),
+    key('\u0000', @console.LeftArrow, shift=true),
+    key('\u0000', @console.LeftArrow, shift=true),
+    key('\u0011', @console.Q, control=true),
+    key('\u0005', @console.E, control=true),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard, configuration~)
+
+  let result = prompt.read_line_with_prompt(FormattedString::new("> "))
+  assert_true(result.is_success)
+  assert_eq(result.text, "a")
+  assert_eq(clipboard.text, "bc")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt kill tail then yank restores killed text" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('c', @console.C),
+    key('d', @console.D),
+    key('e', @console.E),
+    key('\u0000', @console.LeftArrow),
+    key('\u0000', @console.LeftArrow),
+    key('\u000b', @console.K, control=true),
+    key('\u0019', @console.Y, control=true),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "abcde")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt yank pop cycles after repeated kill-line-head" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('c', @console.C),
+    key('\u0015', @console.U, control=true),
+    key('d', @console.D),
+    key('e', @console.E),
+    key('\u0015', @console.U, control=true),
+    key('\u0019', @console.Y, control=true),
+    key('\u0000', @console.Y, alt=true),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "abc")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt completion navigation accepts selected item" {
+  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
+    [
+      CompletionItem::new("ONE", filter_text="a1"),
+      CompletionItem::new("TWO", filter_text="za"),
+    ]
+  })
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('\t', @console.Tab),
+    key('\u0000', @console.DownArrow),
+    key('\t', @console.Tab),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "TWO")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt search mode handles reverse, backspace and dismiss" {
+  let console = FakeInputConsole::new([
+    key('h', @console.H),
+    key('e', @console.E),
+    key('l', @console.L),
+    key('l', @console.L),
+    key('o', @console.O),
+    key('\n', @console.Enter),
+    key('\u0012', @console.R, control=true),
+    key('h', @console.H),
+    key('\u0012', @console.R, control=true),
+    key('\u0008', @console.Backspace),
+    key('\u001b', @console.Escape),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let first = prompt.read_line()
+  assert_true(first.is_success)
+  assert_eq(first.text, "hello")
+
+  let second = prompt.read_line()
+  assert_true(second.is_success)
+  assert_eq(second.text, "hello")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt selection delete paths handle home/end selections" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('c', @console.C),
+    key('\u0000', @console.Home),
+    key('\u0000', @console.End, shift=true),
+    key('\u0008', @console.Backspace),
+    key('x', @console.X),
+    key('y', @console.Y),
+    key('\u0000', @console.Home),
+    key('\u0000', @console.End, shift=true),
+    key('\u0000', @console.Delete),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt continues after unhandled key input" {
+  let console = FakeInputConsole::new([
+    key('\u001b', @console.Escape),
+    key('a', @console.A),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "a")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt supports undo and redo" {
+  let redo = @pretty_prompt.KeyPressPatterns::single(
+    @pretty_prompt.KeyPressPattern::new(@console.G, control=true),
+  )
+  let key_bindings = @pretty_prompt.KeyBindings::new(redo~)
+  let configuration = @pretty_prompt.PromptConfiguration::new(key_bindings~)
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('c', @console.C),
+    key('\u001a', @console.Z, control=true),
+    key('\u0007', @console.G, control=true),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "abc")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt completion panel handles previous and dismiss" {
+  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
+    [
+      CompletionItem::new("ONE", filter_text="a1"),
+      CompletionItem::new("TWO", filter_text="za"),
+    ]
+  })
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('\t', @console.Tab),
+    key('\u0000', @console.UpArrow),
+    key('\u001b', @console.Escape),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "a")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt overload panel supports navigation keys" {
+  let configuration = @pretty_prompt.PromptConfiguration::new(overload_provider=(
+    _,
+    _,
+  ) => [OverloadItem::new("f(a)"), OverloadItem::new("f(a, b)")])
+  let console = FakeInputConsole::new([
+    key('f', @console.F),
+    key('(', @console.D9, shift=true),
+    key('\u0000', @console.DownArrow),
+    key('\u0000', @console.UpArrow),
+    key('\u001b', @console.Escape),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "f(")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt handles paste burst as single input" {
+  let console = FakeInputConsole::new_with_batch(
+    [
+      key('p', @console.P),
+      key('a', @console.A),
+      key('s', @console.S),
+      key('t', @console.T),
+    ],
+    true,
+  )
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "past")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt updates completion filter after character delete" {
+  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
+    [CompletionItem::new("alpha")]
+  })
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('\t', @console.Tab),
+    key('\u0008', @console.Backspace),
+    key('\u001b', @console.Escape),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt search mode can be closed by submit key" {
+  let console = FakeInputConsole::new([
+    key('h', @console.H),
+    key('i', @console.I),
+    key('\n', @console.Enter),
+    key('\u0012', @console.R, control=true),
+    key('\n', @console.Enter),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let first = prompt.read_line()
+  assert_true(first.is_success)
+  assert_eq(first.text, "hi")
+
+  let second = prompt.read_line()
+  assert_true(second.is_success)
+  assert_eq(second.text, "")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt history next returns to current buffer" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('\n', @console.Enter),
+    key('b', @console.B),
+    key('\n', @console.Enter),
+    key('x', @console.X),
+    key('\u0000', @console.UpArrow),
+    key('\u0000', @console.DownArrow),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  ignore(prompt.read_line())
+  ignore(prompt.read_line())
+  let third = prompt.read_line()
+  assert_true(third.is_success)
+  assert_eq(third.text, "x")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt selection move right and home selection" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('c', @console.C),
+    key('\u0000', @console.LeftArrow),
+    key('\u0000', @console.RightArrow, shift=true),
+    key('\u0000', @console.Home, shift=true),
+    key('\u0008', @console.Backspace),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "c")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt completion accept removes right-side word" {
+  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
+    [CompletionItem::new("X", filter_text="ab")]
+  })
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key(' ', @console.A),
+    key('c', @console.C),
+    key('d', @console.D),
+    key('\u0000', @console.LeftArrow),
+    key('\u0000', @console.LeftArrow),
+    key('\t', @console.Tab),
+    key('\t', @console.Tab),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "ab X")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt history next can move to later matching entry" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('p', @console.P),
+    key('p', @console.P),
+    key('l', @console.L),
+    key('e', @console.E),
+    key('\n', @console.Enter),
+    key('a', @console.A),
+    key('p', @console.P),
+    key('r', @console.R),
+    key('i', @console.I),
+    key('c', @console.C),
+    key('o', @console.O),
+    key('t', @console.T),
+    key('\n', @console.Enter),
+    key('a', @console.A),
+    key('\u0000', @console.UpArrow),
+    key('\u0000', @console.UpArrow),
+    key('\u0000', @console.DownArrow),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  ignore(prompt.read_line())
+  ignore(prompt.read_line())
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "apricot")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt move right branch keeps text" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('\u0000', @console.LeftArrow),
+    key('\u0000', @console.RightArrow),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "ab")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt character input updates completion filter when open" {
+  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
+    [CompletionItem::new("alpha")]
+  })
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('\t', @console.Tab),
+    key('b', @console.B),
+    key('\u001b', @console.Escape),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "ab")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt backward delete word updates completion filter" {
+  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
+    [CompletionItem::new("alpha")]
+  })
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('\t', @console.Tab),
+    key('\u0017', @console.W, control=true),
+    key('\u001b', @console.Escape),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt dot character triggers completer path" {
+  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
+    [CompletionItem::new("method")]
+  })
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('.', @console.A),
+    key('\u001b', @console.Escape),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "a.")
+
+  prompt.dispose()
 }

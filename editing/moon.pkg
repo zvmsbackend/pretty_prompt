@@ -4,3 +4,7 @@ import {
   "moonbitlang/x/codec/base64",
   "moonbitlang/async/fs",
 }
+
+import {
+  "moonbitlang/async",
+} for "wbtest"
