@@ -79,13 +79,16 @@ pub struct CompletionItem {
   display_text : String
   filter_text : String
 }
+pub fn CompletionItem::get_priority(Self, String) -> Int
 pub fn CompletionItem::new(String, display_text? : String, filter_text? : String) -> Self
 
 pub struct CompletionState {
-  items : Array[CompletionItem]
+  mut items : Array[CompletionItem]
   mut selected_index : Int
-  filter_prefix : String
+  mut filter_prefix : String
+  all_items : Array[CompletionItem]
 }
+pub fn CompletionState::filter(Self, String) -> Unit
 pub fn CompletionState::new(Array[CompletionItem], String) -> Self
 
 pub struct ConsoleFormat {
