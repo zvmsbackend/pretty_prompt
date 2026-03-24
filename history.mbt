@@ -34,7 +34,7 @@ pub fn HistoryLog::new(config : HistoryConfiguration) -> HistoryLog {
     config,
     navigation_index: None,
     unsubmitted_buffer: "",
-    submissions_since_last_trim: 0
+    submissions_since_last_trim: 0,
   }
 }
 
@@ -137,8 +137,7 @@ pub async fn HistoryLog::track_submission(
   trim_entries(self.entries, self.config.max_entries)
   self.append_persistent_history_entry(text)
 
-  self.submissions_since_last_trim = self.submissions_since_last_trim +
-    1
+  self.submissions_since_last_trim = self.submissions_since_last_trim + 1
   if self.submissions_since_last_trim >= 100 {
     self.save_persistent_history_full()
     self.submissions_since_last_trim = 0

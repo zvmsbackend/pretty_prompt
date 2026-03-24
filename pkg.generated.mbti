@@ -19,6 +19,8 @@ pub fn is_word_boundary(Char?, Char?) -> Bool
 
 pub fn read_key_presses(&ConsolePort) -> Array[KeyPress]
 
+pub fn render_diff(&ConsolePort, Screen, Screen, Int, Int) -> Unit
+
 // Errors
 pub suberror ClipboardPortError {
   NotAvailable
@@ -50,6 +52,7 @@ pub(all) enum AnsiColor {
   Color256(Int)
   Rgb(Int, Int, Int)
 }
+pub impl Eq for AnsiColor
 
 pub struct CancelController {
   console : &ConsolePort
@@ -61,6 +64,15 @@ pub fn CancelController::is_cancellation_requested(Self) -> Bool
 pub fn CancelController::new(&ConsolePort) -> Self
 pub fn CancelController::set_mode(Self, ControlCMode) -> Unit
 pub fn CancelController::take_cancellation_requested(Self) -> Bool
+
+pub struct Cell {
+  char : Char
+  format : ConsoleFormat
+}
+pub fn Cell::default() -> Self
+pub fn Cell::new(Char, ConsoleFormat) -> Self
+pub fn Cell::op_equal(Self, Self) -> Bool
+pub impl Eq for Cell
 
 pub struct CompletionItem {
   replacement_text : String
@@ -85,6 +97,7 @@ pub struct ConsoleFormat {
 }
 pub fn ConsoleFormat::default() -> Self
 pub fn ConsoleFormat::new(foreground? : AnsiColor, background? : AnsiColor, bold? : Bool, italic? : Bool, underline? : Bool) -> Self
+pub impl Eq for ConsoleFormat
 
 pub(all) enum ControlCMode {
   CaptureAsInput
@@ -110,9 +123,9 @@ pub fn HistoryConfiguration::new(persistent_history_filepath? : String, max_entr
 pub struct HistoryLog {
   entries : Array[String]
   config : HistoryConfiguration
-  navigation_index : @ref.Ref[Int?]
-  unsubmitted_buffer : @ref.Ref[String]
-  submissions_since_last_trim : @ref.Ref[Int]
+  mut navigation_index : Int?
+  mut unsubmitted_buffer : String
+  mut submissions_since_last_trim : Int
 }
 pub fn HistoryLog::entry_count(Self) -> Int
 pub async fn HistoryLog::load_persistent_history(Self) -> Unit
@@ -173,7 +186,8 @@ pub struct Prompt {
   configuration : PromptConfiguration
   history : HistoryLog
   cancel_controller : CancelController
-  completion_state : @ref.Ref[CompletionState?]
+  mut completion_state : CompletionState?
+  mut last_screen : Screen?
 }
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
@@ -198,6 +212,16 @@ pub struct PromptResult {
 }
 pub fn PromptResult::cancelled(@console.ConsoleKeyInfo) -> Self
 pub fn PromptResult::submitted(String, @console.ConsoleKeyInfo) -> Self
+
+pub struct Screen {
+  rows : Array[Array[Cell]]
+  width : Int
+  height : Int
+  mut cursor_row : Int
+  mut cursor_col : Int
+}
+pub fn Screen::draw_string(Self, Int, Int, String, ConsoleFormat) -> Unit
+pub fn Screen::new(Int, Int) -> Self
 
 pub struct SystemClipboardPort {
 }

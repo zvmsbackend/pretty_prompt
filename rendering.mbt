@@ -1,4 +1,5 @@
-///| 屏幕上的一个单元格
+///|
+/// 屏幕上的一个单元格
 pub struct Cell {
   char : Char
   format : ConsoleFormat
@@ -14,7 +15,8 @@ pub fn Cell::default() -> Cell {
   { char: ' ', format: ConsoleFormat::default() }
 }
 
-///| 判断两个单元格是否完全一致（内容和样式）
+///|
+/// 判断两个单元格是否完全一致（内容和样式）
 pub fn Cell::op_equal(self : Cell, other : Cell) -> Bool {
   self.char == other.char &&
   self.format.foreground == other.format.foreground &&
@@ -24,7 +26,8 @@ pub fn Cell::op_equal(self : Cell, other : Cell) -> Bool {
   self.format.underline == other.format.underline
 }
 
-///| 虚拟屏幕缓冲区
+///|
+/// 虚拟屏幕缓冲区
 pub struct Screen {
   rows : Array[Array[Cell]]
   width : Int
@@ -33,7 +36,8 @@ pub struct Screen {
   mut cursor_col : Int
 }
 
-///| 创建指定大小的空屏幕
+///|
+/// 创建指定大小的空屏幕
 pub fn Screen::new(height : Int, width : Int) -> Screen {
   let rows = Array::new(capacity=height)
   for _ in 0..<height {
@@ -46,13 +50,14 @@ pub fn Screen::new(height : Int, width : Int) -> Screen {
   { rows, width, height, cursor_row: 0, cursor_col: 0 }
 }
 
-///| 在指定位置绘制带样式的字符串（处理 Unicode 宽度）
+///|
+/// 在指定位置绘制带样式的字符串（处理 Unicode 宽度）
 pub fn Screen::draw_string(
   self : Screen,
   row : Int,
   col : Int,
   text : String,
-  format : ConsoleFormat
+  format : ConsoleFormat,
 ) -> Unit {
   if row < 0 || row >= self.height {
     return
@@ -74,13 +79,14 @@ pub fn Screen::draw_string(
   }
 }
 
-///| 将新旧屏幕差异输出到控制台
+///|
+/// 将新旧屏幕差异输出到控制台
 pub fn render_diff(
   console : &ConsolePort,
   new_screen : Screen,
   old_screen : Screen,
   base_row : Int,
-  base_col : Int
+  base_col : Int,
 ) -> Unit {
   let mut current_format = ConsoleFormat::default()
   console.write("\u{1b}[0m") // 重置初始样式

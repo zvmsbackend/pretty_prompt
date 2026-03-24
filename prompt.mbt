@@ -353,7 +353,12 @@ async fn Prompt::render_line(
 ) -> Unit {
   let width = self.console.get_buffer_width()
   let completion_items_count = match self.completion_state {
-    Some(state) => if state.items.length() < 5 { state.items.length() } else { 5 }
+    Some(state) =>
+      if state.items.length() < 5 {
+        state.items.length()
+      } else {
+        5
+      }
     None => 0
   }
   let height = 1 + completion_items_count
@@ -375,13 +380,23 @@ async fn Prompt::render_line(
     if span.start >= current_pos {
       // Before span
       for i in current_pos..<span.start {
-        new_screen.draw_string(0, current_col, chars[i].to_string(), ConsoleFormat::default())
+        new_screen.draw_string(
+          0,
+          current_col,
+          chars[i].to_string(),
+          ConsoleFormat::default(),
+        )
         current_col = current_col + get_char_width(chars[i])
       }
       // Span
       let end = @cmp.minimum(span.start + span.length, chars.length())
       for i in span.start..<end {
-        new_screen.draw_string(0, current_col, chars[i].to_string(), span.format)
+        new_screen.draw_string(
+          0,
+          current_col,
+          chars[i].to_string(),
+          span.format,
+        )
         current_col = current_col + get_char_width(chars[i])
       }
       current_pos = end
@@ -389,7 +404,12 @@ async fn Prompt::render_line(
   }
   // Remaining
   for i in current_pos..<chars.length() {
-    new_screen.draw_string(0, current_col, chars[i].to_string(), ConsoleFormat::default())
+    new_screen.draw_string(
+      0,
+      current_col,
+      chars[i].to_string(),
+      ConsoleFormat::default(),
+    )
     current_col = current_col + get_char_width(chars[i])
   }
 
@@ -412,9 +432,19 @@ async fn Prompt::render_line(
       let item = state.items[item_index]
       let row = 1 + i
       if item_index == state.selected_index {
-        new_screen.draw_string(row, 0, "> \{item.display_text}", ConsoleFormat::new(bold=true, underline=true))
+        new_screen.draw_string(
+          row,
+          0,
+          "> \{item.display_text}",
+          ConsoleFormat::new(bold=true, underline=true),
+        )
       } else {
-        new_screen.draw_string(row, 2, item.display_text, ConsoleFormat::default())
+        new_screen.draw_string(
+          row,
+          2,
+          item.display_text,
+          ConsoleFormat::default(),
+        )
       }
     }
   }
