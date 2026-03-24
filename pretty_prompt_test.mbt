@@ -435,7 +435,7 @@ test "read_key_presses keeps control burst as key presses" {
 }
 
 ///|
-test "prompt read_line submits typed text" {
+async test "prompt read_line submits typed text" {
   let console = FakeInputConsole::new([
     key('h', @console.H),
     key('i', @console.I),
@@ -456,7 +456,7 @@ test "prompt read_line submits typed text" {
 }
 
 ///|
-test "prompt read_line handles backspace" {
+async test "prompt read_line handles backspace" {
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('b', @console.B),
@@ -474,7 +474,7 @@ test "prompt read_line handles backspace" {
 }
 
 ///|
-test "prompt read_line inserts in middle with arrows" {
+async test "prompt read_line inserts in middle with arrows" {
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('c', @console.C),
@@ -493,7 +493,7 @@ test "prompt read_line inserts in middle with arrows" {
 }
 
 ///|
-test "prompt read_line supports delete key" {
+async test "prompt read_line supports delete key" {
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('b', @console.B),
@@ -514,7 +514,7 @@ test "prompt read_line supports delete key" {
 }
 
 ///|
-test "prompt read_line supports home and end" {
+async test "prompt read_line supports home and end" {
   let console = FakeInputConsole::new([
     key('b', @console.B),
     key('c', @console.C),
@@ -535,7 +535,7 @@ test "prompt read_line supports home and end" {
 }
 
 ///|
-test "prompt read_line returns cancelled on ctrl c" {
+async test "prompt read_line returns cancelled on ctrl c" {
   let console = FakeInputConsole::new([key('\u0003', @console.C, control=true)])
   let clipboard = FakeClipboard::new("")
   let prompt = @pretty_prompt.Prompt::new(console, clipboard)
@@ -550,7 +550,7 @@ test "prompt read_line returns cancelled on ctrl c" {
 }
 
 ///|
-test "prompt read_line uses configured default prompt" {
+async test "prompt read_line uses configured default prompt" {
   let console = FakeInputConsole::new([
     key('o', @console.O),
     key('k', @console.K),
@@ -569,7 +569,7 @@ test "prompt read_line uses configured default prompt" {
 }
 
 ///|
-test "prompt read_line uses custom submit key binding" {
+async test "prompt read_line uses custom submit key binding" {
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('b', @console.B),
@@ -593,7 +593,7 @@ test "prompt read_line uses custom submit key binding" {
 }
 
 ///|
-test "prompt history recalls previous entry" {
+async test "prompt history recalls previous entry" {
   let console = FakeInputConsole::new([
     key('f', @console.F),
     key('i', @console.I),
@@ -619,9 +619,9 @@ test "prompt history recalls previous entry" {
 }
 
 ///|
-test "prompt persistent history is loaded across prompt instances" {
+async test "prompt persistent history is loaded across prompt instances" {
   let history_path = "_build/pretty_prompt_history_test.log"
-  @fs.remove_file(history_path) catch {
+  @fs.remove(history_path) catch {
     _ => ()
   }
 
@@ -666,7 +666,7 @@ test "prompt persistent history is loaded across prompt instances" {
   assert_eq(loaded.text, "saved")
   reader_prompt.dispose()
 
-  @fs.remove_file(history_path) catch {
+  @fs.remove(history_path) catch {
     _ => ()
   }
 }

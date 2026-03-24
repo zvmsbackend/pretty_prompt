@@ -8,23 +8,24 @@ pub struct Prompt {
 }
 
 ///|
-pub fn Prompt::new(
+pub async fn Prompt::new(
   console : &ConsolePort,
   clipboard : &ClipboardPort,
   configuration? : PromptConfiguration = PromptConfiguration::default(),
 ) -> Prompt {
   let cancel_controller = CancelController::new(console)
   let history = HistoryLog::new(configuration.history)
+  history.load_persistent_history()
   { console, clipboard, configuration, history, cancel_controller }
 }
 
 ///|
-pub fn Prompt::read_line(self : Prompt) -> PromptResult {
+pub async fn Prompt::read_line(self : Prompt) -> PromptResult {
   self.read_line_with_prompt(self.configuration.prompt)
 }
 
 ///|
-pub fn Prompt::read_line_with_prompt(
+pub async fn Prompt::read_line_with_prompt(
   self : Prompt,
   prompt : String,
 ) -> PromptResult {
@@ -155,7 +156,8 @@ pub fn Prompt::take_execution_cancellation_requested(self : Prompt) -> Bool {
 }
 
 ///|
-pub fn Prompt::dispose(self : Prompt) -> Unit {
+pub async fn Prompt::dispose(self : Prompt) -> Unit {
+  self.history.save_persistent_history_full()
   self.cancel_controller.dispose()
 }
 

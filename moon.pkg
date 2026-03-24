@@ -2,7 +2,11 @@ import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/ref",
   "moonbitlang/x/codec/base64",
-  "moonbitlang/x/fs",
+  "moonbitlang/async/fs",
   "sennenki/console",
   "sennenki/clipboard",
 }
+
+import {
+  "moonbitlang/async",
+} for "test"

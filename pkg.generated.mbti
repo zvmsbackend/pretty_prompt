@@ -49,13 +49,16 @@ pub struct HistoryLog {
   config : HistoryConfiguration
   navigation_index : @ref.Ref[Int?]
   unsubmitted_buffer : @ref.Ref[String]
+  submissions_since_last_trim : @ref.Ref[Int]
 }
 pub fn HistoryLog::entry_count(Self) -> Int
+pub async fn HistoryLog::load_persistent_history(Self) -> Unit
 pub fn HistoryLog::navigate_next(Self) -> String?
 pub fn HistoryLog::navigate_previous(Self, String) -> String?
 pub fn HistoryLog::new(HistoryConfiguration) -> Self
 pub fn HistoryLog::reset_navigation(Self) -> Unit
-pub fn HistoryLog::track_submission(Self, String) -> Unit
+pub async fn HistoryLog::save_persistent_history_full(Self) -> Unit
+pub async fn HistoryLog::track_submission(Self, String) -> Unit
 
 pub struct KeyBindings {
   submit_prompt : KeyPressPatterns
@@ -102,10 +105,10 @@ pub struct Prompt {
   history : HistoryLog
   cancel_controller : CancelController
 }
-pub fn Prompt::dispose(Self) -> Unit
-pub fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
-pub fn Prompt::read_line(Self) -> PromptResult
-pub fn Prompt::read_line_with_prompt(Self, String) -> PromptResult
+pub async fn Prompt::dispose(Self) -> Unit
+pub async fn Prompt::new(&ConsolePort, &ClipboardPort, configuration? : PromptConfiguration) -> Self
+pub async fn Prompt::read_line(Self) -> PromptResult
+pub async fn Prompt::read_line_with_prompt(Self, String) -> PromptResult
 pub fn Prompt::take_execution_cancellation_requested(Self) -> Bool
 
 pub struct PromptConfiguration {

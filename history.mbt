@@ -24,18 +24,43 @@ pub struct HistoryLog {
   config : HistoryConfiguration
   navigation_index : Ref[Int?]
   unsubmitted_buffer : Ref[String]
+  submissions_since_last_trim : Ref[Int]
 }
 
 ///|
 pub fn HistoryLog::new(config : HistoryConfiguration) -> HistoryLog {
-  let log = {
+  {
     entries: [],
     config,
     navigation_index: @ref.new(None),
     unsubmitted_buffer: @ref.new(""),
+    submissions_since_last_trim: @ref.new(0),
   }
-  log.load_persistent_history()
-  log
+}
+
+///|
+pub async fn HistoryLog::load_persistent_history(self : HistoryLog) -> Unit {
+  let filepath = match self.config.persistent_history_filepath {
+    Some(filepath) => filepath
+    None => return
+  }
+
+  if !@fs.exists(filepath) {
+    return
+  }
+
+  let contents = @fs.read_file(filepath).text() catch { _ => return }
+
+  self.entries.clear()
+  for line in contents.split("\n") {
+    if line.length() == 0 {
+      continue
+    }
+    let decoded = @base64.decode(line) catch { _ => continue }
+    let text = @utf8.decode(decoded) catch { _ => continue }
+    self.entries.push(text)
+  }
+  trim_entries(self.entries, self.config.max_entries)
 }
 
 ///|
@@ -95,7 +120,10 @@ pub fn HistoryLog::reset_navigation(self : HistoryLog) -> Unit {
 }
 
 ///|
-pub fn HistoryLog::track_submission(self : HistoryLog, text : String) -> Unit {
+pub async fn HistoryLog::track_submission(
+  self : HistoryLog,
+  text : String,
+) -> Unit {
   self.reset_navigation()
   if text.length() == 0 {
     return
@@ -107,7 +135,14 @@ pub fn HistoryLog::track_submission(self : HistoryLog, text : String) -> Unit {
 
   self.entries.push(text)
   trim_entries(self.entries, self.config.max_entries)
-  self.save_persistent_history()
+  self.append_persistent_history_entry(text)
+
+  self.submissions_since_last_trim.val = self.submissions_since_last_trim.val +
+    1
+  if self.submissions_since_last_trim.val >= 100 {
+    self.save_persistent_history_full()
+    self.submissions_since_last_trim.val = 0
+  }
 }
 
 ///|
@@ -177,7 +212,35 @@ fn matches_history_pattern(entry : String, pattern : String) -> Bool {
 }
 
 ///|
-fn HistoryLog::save_persistent_history(self : HistoryLog) -> Unit {
+async fn HistoryLog::append_persistent_history_entry(
+  self : HistoryLog,
+  text : String,
+) -> Unit {
+  let filepath = match self.config.persistent_history_filepath {
+    Some(filepath) => filepath
+    None => return
+  }
+
+  let entry = "\{text |> @utf8.encode |> @base64.encode}\n"
+  let file = @fs.open(
+    filepath,
+    mode=WriteOnly,
+    sync=Data,
+    append=true,
+    create=0o644,
+  ) catch {
+    _ => return
+  }
+  defer file.close()
+  file.write(entry) catch {
+    _ => ()
+  }
+}
+
+///|
+pub async fn HistoryLog::save_persistent_history_full(
+  self : HistoryLog,
+) -> Unit {
   let filepath = match self.config.persistent_history_filepath {
     Some(filepath) => filepath
     None => return
@@ -189,31 +252,7 @@ fn HistoryLog::save_persistent_history(self : HistoryLog) -> Unit {
     lines..write_string(encoded).write_char('\n')
   }
 
-  @fs.write_string_to_file(filepath, lines.to_string()) catch {
+  @fs.write_file(filepath, lines.to_string(), create=0o644) catch {
     _ => ()
   }
-}
-
-///|
-fn HistoryLog::load_persistent_history(self : HistoryLog) -> Unit {
-  let filepath = match self.config.persistent_history_filepath {
-    Some(filepath) => filepath
-    None => return
-  }
-
-  if !@fs.path_exists(filepath) {
-    return
-  }
-
-  let contents = @fs.read_file_to_string(filepath) catch { _ => return }
-
-  for line in contents.split("\n") {
-    if line.length() == 0 {
-      continue
-    }
-    let decoded = @base64.decode(line) catch { _ => continue }
-    let text = @utf8.decode(decoded) catch { _ => continue }
-    self.entries.push(text)
-  }
-  trim_entries(self.entries, self.config.max_entries)
 }
