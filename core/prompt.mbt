@@ -80,10 +80,8 @@ pub async fn Prompt::read_line_with_prompt(
 ) -> PromptResult {
   self.cancel_controller.set_mode(CaptureAsInput)
   self.console.write(prompt.text)
-  let left : Array[Char] = []
-  let right : Array[Char] = []
+  let state = InputState::new()
   let key_bindings = self.configuration.key_bindings
-  let mut last_was_yank = false
 
   while true {
     if self.cancel_controller.take_cancellation_requested() {
@@ -94,422 +92,642 @@ pub async fn Prompt::read_line_with_prompt(
 
     let key_presses = read_key_presses(self.console)
     for key_press in key_presses {
-      let info = key_press.console_key_info
-
-      if is_control_c_key(info) {
-        self.completion_state = None
-        self.overload_state = None
-        self.selection = None
-        self.console.write_line("")
-        self.cancel_controller.set_mode(AllowCancelSignal)
-        return PromptResult::cancelled(info)
-      }
-
-      if key_press.pasted_text is Some(pasted) {
-        self.completion_state = None
-        self.overload_state = None
-        self.search_state = None
-        self.delete_selection(left, right)
-        left.push_iter(pasted.iter())
-        self.track_undo(left, right)
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-
-      // 2. Search Mode Handling
-      if self.search_state is Some(state) {
-        if key_bindings.reverse_search.matches(info) {
-          if self.history.navigate_search(state.query, state.history_index - 1)
-            is Some(res) {
-            state.set_history_index(res.0)
-            self.set_line_buffers(left, right, res.1)
-          }
-          self.render_line(prompt, left, right)
-          continue
-        }
-        if key_bindings.dismiss_completion.matches(info) {
-          self.search_state = None
-          self.render_line(prompt, left, right)
-          continue
-        }
-        if key_bindings.submit_prompt.matches(info) {
-          self.search_state = None
-          self.render_line(prompt, left, right)
-          continue
-        }
-        if key_bindings.backward_delete_character.matches(info) {
-          if state.query.length() > 0 {
-            state.set_query(
-              state.query.sub(end=state.query.length() - 1).to_string(),
-            )
-            if self.history.navigate_search(state.query, -1) is Some(res) {
-              state.set_history_index(res.0)
-              self.set_line_buffers(left, right, res.1)
-            }
-          }
-          self.render_line(prompt, left, right)
-          continue
-        }
-        let ch = info.key_char
-        if !ch.is_control() {
-          state.set_query(state.query + ch.to_string())
-          if self.history.navigate_search(state.query, -1) is Some(res) {
-            state.set_history_index(res.0)
-            self.set_line_buffers(left, right, res.1)
-          }
-          self.render_line(prompt, left, right)
-          continue
-        }
-        // Other keys exit search
-        self.search_state = None
-      }
-
-      // 3. Navigation Modes (Completion/Overload)
-      if self.completion_state is Some(_) || self.overload_state is Some(_) {
-        if key_bindings.dismiss_completion.matches(info) {
-          self.completion_state = None
-          self.overload_state = None
-          self.render_line(prompt, left, right)
-          last_was_yank = false
-          continue
-        }
-        if key_bindings.history_previous.matches(info) {
-          match self.completion_state {
-            Some(s) =>
-              s.set_selected_index(
-                (s.selected_index + s.items.length() - 1) % s.items.length(),
-              )
-            None =>
-              if self.overload_state is Some(s) {
-                s.set_selected_index(
-                  (s.selected_index + s.items.length() - 1) % s.items.length(),
-                )
-              }
-          }
-          self.render_line(prompt, left, right)
-          last_was_yank = false
-          continue
-        }
-        if key_bindings.history_next.matches(info) {
-          match self.completion_state {
-            Some(s) =>
-              s.set_selected_index((s.selected_index + 1) % s.items.length())
-            None =>
-              if self.overload_state is Some(s) {
-                s.set_selected_index((s.selected_index + 1) % s.items.length())
-              }
-          }
-          self.render_line(prompt, left, right)
-          last_was_yank = false
-          continue
-        }
-        if self.completion_state is Some(s) {
-          if key_bindings.submit_prompt.matches(info) ||
-            key_bindings.trigger_completion.matches(info) {
-            if s.items.length() > 0 {
-              let item = s.items[s.selected_index]
-              while left.length() > 0 &&
-                    is_word_character(left[left.length() - 1]) {
-                ignore(left.pop())
-              }
-              while right.length() > 0 &&
-                    is_word_character(right[right.length() - 1]) {
-                ignore(right.pop())
-              }
-              left.push_iter(item.replacement_text.iter())
-              self.track_undo(left, right)
-            }
-            self.completion_state = None
-            self.render_line(prompt, left, right)
-            last_was_yank = false
-            continue
-          }
-        }
-      }
-
-      // 4. Ctrl+R Search Trigger
-      if key_bindings.reverse_search.matches(info) {
-        self.completion_state = None
-        self.overload_state = None
-        self.search_state = Some(SearchState::new())
-        self.render_line(prompt, left, right)
-        continue
-      }
-
-      // 5. Selection & Clipboard
-      if key_bindings.copy_selection.matches(info) {
-        if self.selection is Some(sel) {
-          let (start, end) = sel.range()
-          let text = line_from_buffers(left, right)
-          let selected_text = text.sub(start~, end~).to_string()
-          let _ = self.clipboard.write_text(selected_text) catch { _ => () }
-        }
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.cut_selection.matches(info) {
-        if self.selection is Some(sel) {
-          let (start, end) = sel.range()
-          let text = line_from_buffers(left, right)
-          let selected_text = text.sub(start~, end~).to_string()
-          let _ = self.clipboard.write_text(selected_text) catch { _ => () }
-          self.kill_ring.add(selected_text)
-          self.delete_selection(left, right)
-          self.track_undo(left, right)
-          self.render_line(prompt, left, right)
-        }
-        last_was_yank = false
-        continue
-      }
-
-      // 6. Kill Ring Actions
-      if key_bindings.kill_line_tail.matches(info) {
-        if right.length() > 0 {
-          let text = String::from_array(right.rev())
-          self.kill_ring.add(text)
-          right.clear()
-          self.track_undo(left, right)
-          self.render_line(prompt, left, right)
-        }
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.kill_line_head.matches(info) {
-        if left.length() > 0 {
-          let text = String::from_array(left)
-          self.kill_ring.add(text)
-          left.clear()
-          self.track_undo(left, right)
-          self.render_line(prompt, left, right)
-        }
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.yank.matches(info) {
-        if self.kill_ring.yank() is Some(text) {
-          self.delete_selection(left, right)
-          left.push_iter(text.iter())
-          self.track_undo(left, right)
-          self.render_line(prompt, left, right)
-          last_was_yank = true
-        }
-        continue
-      }
-      if key_bindings.yank_pop.matches(info) && last_was_yank {
-        if self.undo_manager.undo() is Some(record) {
-          self.apply_undo_record(left, right, record)
-          if self.kill_ring.yank_pop() is Some(text) {
-            left.push_iter(text.iter())
-            self.track_undo(left, right)
-          }
-          self.render_line(prompt, left, right)
-        }
-        continue
-      }
-
-      // 7. Movement & Selection Movement
-      if key_bindings.move_left_selection.matches(info) {
-        self.handle_selection_movement(left, right, -1)
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.move_right_selection.matches(info) {
-        self.handle_selection_movement(left, right, 1)
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.move_home_selection.matches(info) {
-        self.handle_selection_movement(left, right, -left.length())
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.move_end_selection.matches(info) {
-        self.handle_selection_movement(left, right, right.length())
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-
-      // 8. Undo/Redo
-      if key_bindings.undo.matches(info) {
-        self.completion_state = None
-        self.overload_state = None
-        self.selection = None
-        if self.undo_manager.undo() is Some(record) {
-          self.apply_undo_record(left, right, record)
-          self.render_line(prompt, left, right)
-        }
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.redo.matches(info) {
-        self.completion_state = None
-        self.overload_state = None
-        self.selection = None
-        if self.undo_manager.redo() is Some(record) {
-          self.apply_undo_record(left, right, record)
-          self.render_line(prompt, left, right)
-        }
-        last_was_yank = false
-        continue
-      }
-
-      // 9. Standard Keys
-      if key_bindings.trigger_completion.matches(info) {
-        let raw_line = line_from_buffers(left, right)
-        let items = (self.configuration.completer)(raw_line, left.length())
-        if items.length() > 0 {
-          let prefix_chars = left
-            .rev_iter()
-            .take_while(is_word_character)
-            .collect()
-          self.completion_state = Some(
-            CompletionState::new(items, String::from_array(prefix_chars.rev())),
-          )
-          self.render_line(prompt, left, right)
-        }
-        continue
-      }
-      if key_bindings.history_previous.matches(info) {
-        self.completion_state = None
-        self.selection = None
-        if self.history.navigate_previous(line_from_buffers(left, right))
-          is Some(entry) {
-          self.set_line_buffers(left, right, entry)
-          self.track_undo(left, right)
-          self.render_line(prompt, left, right)
-        }
-        continue
-      }
-      if key_bindings.history_next.matches(info) {
-        self.completion_state = None
-        self.selection = None
-        if self.history.navigate_next() is Some(entry) {
-          self.set_line_buffers(left, right, entry)
-          self.track_undo(left, right)
-          self.render_line(prompt, left, right)
-        }
-        continue
-      }
-
-      self.history.reset_navigation()
-
-      if key_bindings.cancel_prompt.matches(info) || is_control_c_key(info) {
-        self.completion_state = None
-        self.overload_state = None
-        self.selection = None
-        self.console.write_line("")
-        self.cancel_controller.set_mode(AllowCancelSignal)
-        return PromptResult::cancelled(info)
-      }
-
-      if key_bindings.submit_prompt.matches(info) {
-        self.completion_state = None
-        self.overload_state = None
-        self.selection = None
-        let line = line_from_buffers(left, right)
-        self.history.track_submission(line)
-        self.console.write_line("")
-        self.cancel_controller.set_mode(AllowCancelSignal)
-        return PromptResult::submitted(line, info)
-      }
-
-      if key_bindings.backward_delete_character.matches(info) {
-        if self.selection is Some(_) {
-          self.delete_selection(left, right)
-        } else if left.pop() is Some(_) {
-          if self.completion_state is Some(state) {
-            update_completion_filter(state, left)
-          }
-        }
-        self.track_undo(left, right)
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.delete_character.matches(info) {
-        if self.selection is Some(_) {
-          self.delete_selection(left, right)
-        } else {
-          ignore(right.pop())
-        }
-        self.track_undo(left, right)
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.move_left.matches(info) {
-        self.selection = None
-        if left.pop() is Some(ch) {
-          right.push(ch)
-        }
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.move_right.matches(info) {
-        self.selection = None
-        if right.pop() is Some(ch) {
-          left.push(ch)
-        }
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.move_home.matches(info) {
-        self.selection = None
-        while left.pop() is Some(ch) {
-          right.push(ch)
-        }
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-      if key_bindings.move_end.matches(info) {
-        self.selection = None
-        while right.pop() is Some(ch) {
-          left.push(ch)
-        }
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-        continue
-      }
-
-      let ch = info.key_char
-      if !ch.is_control() {
-        self.delete_selection(left, right)
-        left.push(ch)
-        if self.completion_state is Some(state) {
-          update_completion_filter(state, left)
-        } else if ch == '.' {
-          let raw_line = line_from_buffers(left, right)
-          let items = (self.configuration.completer)(raw_line, left.length())
-          if items.length() > 0 {
-            self.completion_state = Some(CompletionState::new(items, ""))
-          }
-        } else if ch == '(' {
-          let raw_line = line_from_buffers(left, right)
-          let overloads = (self.configuration.overload_provider)(
-            raw_line,
-            left.length(),
-          )
-          if overloads.length() > 0 {
-            self.overload_state = Some(OverloadState::new(overloads))
-          }
-        }
-        self.track_undo(left, right)
-        self.render_line(prompt, left, right)
-        last_was_yank = false
-      } else {
-        last_was_yank = false
+      let result = self.process_key_press(
+        prompt, state, key_bindings, key_press,
+      )
+      match result {
+        Handled => continue
+        NotHandled => ()
+        Return(value) => return value
       }
     }
   }
   cancel_result()
+}
+
+///|
+priv enum KeyProcessingResult {
+  Handled
+  NotHandled
+  Return(PromptResult)
+}
+
+///|
+priv struct InputState {
+  left : Array[Char]
+  right : Array[Char]
+  mut last_was_yank : Bool
+}
+
+///|
+fn InputState::new() -> InputState {
+  { left: [], right: [], last_was_yank: false }
+}
+
+///|
+async fn Prompt::process_key_press(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  key_press : KeyPress,
+) -> KeyProcessingResult {
+  let info = key_press.console_key_info
+  if is_control_c_key(info) {
+    return Return(self.cancel_prompt(info))
+  }
+
+  if key_press.pasted_text is Some(pasted) {
+    self.completion_state = None
+    self.overload_state = None
+    self.search_state = None
+    self.delete_selection(state.left, state.right)
+    state.left.push_iter(pasted.iter())
+    self.track_undo(state.left, state.right)
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+
+  match self.handle_search_mode(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_navigation_modes(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_search_trigger(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_selection_clipboard(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_kill_ring(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_selection_movement_keys(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_undo_redo(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_completion_and_history(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_submit_or_cancel(state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_edit_keys(prompt, state, key_bindings, info) {
+    NotHandled => ()
+    other => return other
+  }
+  match self.handle_character_input(prompt, state, info) {
+    NotHandled => NotHandled
+    other => other
+  }
+}
+
+///|
+fn Prompt::cancel_prompt(
+  self : Prompt,
+  info : @console.ConsoleKeyInfo,
+) -> PromptResult {
+  self.completion_state = None
+  self.overload_state = None
+  self.selection = None
+  self.console.write_line("")
+  self.cancel_controller.set_mode(AllowCancelSignal)
+  PromptResult::cancelled(info)
+}
+
+///|
+async fn Prompt::handle_search_mode(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if self.search_state is Some(search_state) {
+    if key_bindings.reverse_search.matches(info) {
+      if self.history.navigate_search(
+          search_state.query,
+          search_state.history_index - 1,
+        )
+        is Some(res) {
+        search_state.set_history_index(res.0)
+        self.set_line_buffers(state.left, state.right, res.1)
+      }
+      self.render_line(prompt, state.left, state.right)
+      return Handled
+    }
+    if key_bindings.dismiss_completion.matches(info) {
+      self.search_state = None
+      self.render_line(prompt, state.left, state.right)
+      return Handled
+    }
+    if key_bindings.submit_prompt.matches(info) {
+      self.search_state = None
+      self.render_line(prompt, state.left, state.right)
+      return Handled
+    }
+    if key_bindings.backward_delete_character.matches(info) {
+      if search_state.query.length() > 0 {
+        search_state.set_query(
+          search_state.query
+          .sub(end=search_state.query.length() - 1)
+          .to_string(),
+        )
+        if self.history.navigate_search(search_state.query, -1) is Some(res) {
+          search_state.set_history_index(res.0)
+          self.set_line_buffers(state.left, state.right, res.1)
+        }
+      }
+      self.render_line(prompt, state.left, state.right)
+      return Handled
+    }
+    let ch = info.key_char
+    if !ch.is_control() {
+      search_state.set_query(search_state.query + ch.to_string())
+      if self.history.navigate_search(search_state.query, -1) is Some(res) {
+        search_state.set_history_index(res.0)
+        self.set_line_buffers(state.left, state.right, res.1)
+      }
+      self.render_line(prompt, state.left, state.right)
+      return Handled
+    }
+    self.search_state = None
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_navigation_modes(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if self.completion_state is Some(_) || self.overload_state is Some(_) {
+    if key_bindings.dismiss_completion.matches(info) {
+      self.completion_state = None
+      self.overload_state = None
+      self.render_line(prompt, state.left, state.right)
+      state.last_was_yank = false
+      return Handled
+    }
+    if key_bindings.history_previous.matches(info) {
+      match self.completion_state {
+        Some(s) =>
+          s.set_selected_index(
+            cycle_previous_index(s.selected_index, s.items.length()),
+          )
+        None =>
+          if self.overload_state is Some(s) {
+            s.set_selected_index(
+              cycle_previous_index(s.selected_index, s.items.length()),
+            )
+          }
+      }
+      self.render_line(prompt, state.left, state.right)
+      state.last_was_yank = false
+      return Handled
+    }
+    if key_bindings.history_next.matches(info) {
+      match self.completion_state {
+        Some(s) =>
+          s.set_selected_index(
+            cycle_next_index(s.selected_index, s.items.length()),
+          )
+        None =>
+          if self.overload_state is Some(s) {
+            s.set_selected_index(
+              cycle_next_index(s.selected_index, s.items.length()),
+            )
+          }
+      }
+      self.render_line(prompt, state.left, state.right)
+      state.last_was_yank = false
+      return Handled
+    }
+    if self.completion_state is Some(s) {
+      if key_bindings.submit_prompt.matches(info) ||
+        key_bindings.trigger_completion.matches(info) {
+        if s.items.length() > 0 {
+          let item = s.items[s.selected_index]
+          while state.left.length() > 0 &&
+                is_word_character(state.left[state.left.length() - 1]) {
+            ignore(state.left.pop())
+          }
+          while state.right.length() > 0 &&
+                is_word_character(state.right[state.right.length() - 1]) {
+            ignore(state.right.pop())
+          }
+          state.left.push_iter(item.replacement_text.iter())
+          self.track_undo(state.left, state.right)
+        }
+        self.completion_state = None
+        self.render_line(prompt, state.left, state.right)
+        state.last_was_yank = false
+        return Handled
+      }
+    }
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_search_trigger(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if key_bindings.reverse_search.matches(info) {
+    self.completion_state = None
+    self.overload_state = None
+    self.search_state = Some(SearchState::new())
+    self.render_line(prompt, state.left, state.right)
+    return Handled
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_selection_clipboard(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if key_bindings.copy_selection.matches(info) {
+    if self.selection is Some(sel) {
+      let (start, end) = sel.range()
+      let text = line_from_buffers(state.left, state.right)
+      let selected_text = text.sub(start~, end~).to_string()
+      let _ = self.clipboard.write_text(selected_text) catch { _ => () }
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.cut_selection.matches(info) {
+    if self.selection is Some(sel) {
+      let (start, end) = sel.range()
+      let text = line_from_buffers(state.left, state.right)
+      let selected_text = text.sub(start~, end~).to_string()
+      let _ = self.clipboard.write_text(selected_text) catch { _ => () }
+      self.kill_ring.add(selected_text)
+      self.delete_selection(state.left, state.right)
+      self.track_undo(state.left, state.right)
+      self.render_line(prompt, state.left, state.right)
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_kill_ring(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if key_bindings.kill_line_tail.matches(info) {
+    if state.right.length() > 0 {
+      let text = String::from_array(state.right.rev())
+      self.kill_ring.add(text)
+      state.right.clear()
+      self.track_undo(state.left, state.right)
+      self.render_line(prompt, state.left, state.right)
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.kill_line_head.matches(info) {
+    if state.left.length() > 0 {
+      let text = String::from_array(state.left)
+      self.kill_ring.add(text)
+      state.left.clear()
+      self.track_undo(state.left, state.right)
+      self.render_line(prompt, state.left, state.right)
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.yank.matches(info) {
+    if self.kill_ring.yank() is Some(text) {
+      self.delete_selection(state.left, state.right)
+      state.left.push_iter(text.iter())
+      self.track_undo(state.left, state.right)
+      self.render_line(prompt, state.left, state.right)
+      state.last_was_yank = true
+    }
+    return Handled
+  }
+  if key_bindings.yank_pop.matches(info) && state.last_was_yank {
+    if self.undo_manager.undo() is Some(record) {
+      self.apply_undo_record(state.left, state.right, record)
+      if self.kill_ring.yank_pop() is Some(text) {
+        state.left.push_iter(text.iter())
+        self.track_undo(state.left, state.right)
+      }
+      self.render_line(prompt, state.left, state.right)
+    }
+    return Handled
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_selection_movement_keys(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if key_bindings.move_left_selection.matches(info) {
+    self.handle_selection_movement(state.left, state.right, -1)
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_right_selection.matches(info) {
+    self.handle_selection_movement(state.left, state.right, 1)
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_home_selection.matches(info) {
+    self.handle_selection_movement(
+      state.left,
+      state.right,
+      -state.left.length(),
+    )
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_end_selection.matches(info) {
+    self.handle_selection_movement(
+      state.left,
+      state.right,
+      state.right.length(),
+    )
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_undo_redo(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if key_bindings.undo.matches(info) {
+    self.completion_state = None
+    self.overload_state = None
+    self.selection = None
+    if self.undo_manager.undo() is Some(record) {
+      self.apply_undo_record(state.left, state.right, record)
+      self.render_line(prompt, state.left, state.right)
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.redo.matches(info) {
+    self.completion_state = None
+    self.overload_state = None
+    self.selection = None
+    if self.undo_manager.redo() is Some(record) {
+      self.apply_undo_record(state.left, state.right, record)
+      self.render_line(prompt, state.left, state.right)
+    }
+    state.last_was_yank = false
+    return Handled
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_completion_and_history(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if key_bindings.trigger_completion.matches(info) {
+    let raw_line = line_from_buffers(state.left, state.right)
+    let items = (self.configuration.completer)(raw_line, state.left.length())
+    if items.length() > 0 {
+      let prefix_chars = state.left
+        .rev_iter()
+        .take_while(is_word_character)
+        .collect()
+      self.completion_state = Some(
+        CompletionState::new(items, String::from_array(prefix_chars.rev())),
+      )
+      self.render_line(prompt, state.left, state.right)
+    }
+    return Handled
+  }
+  if key_bindings.history_previous.matches(info) {
+    self.completion_state = None
+    self.selection = None
+    if self.history.navigate_previous(
+        line_from_buffers(state.left, state.right),
+      )
+      is Some(entry) {
+      self.set_line_buffers(state.left, state.right, entry)
+      self.track_undo(state.left, state.right)
+      self.render_line(prompt, state.left, state.right)
+    }
+    return Handled
+  }
+  if key_bindings.history_next.matches(info) {
+    self.completion_state = None
+    self.selection = None
+    if self.history.navigate_next() is Some(entry) {
+      self.set_line_buffers(state.left, state.right, entry)
+      self.track_undo(state.left, state.right)
+      self.render_line(prompt, state.left, state.right)
+    }
+    return Handled
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_submit_or_cancel(
+  self : Prompt,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  self.history.reset_navigation()
+
+  if key_bindings.cancel_prompt.matches(info) || is_control_c_key(info) {
+    return Return(self.cancel_prompt(info))
+  }
+
+  if key_bindings.submit_prompt.matches(info) {
+    self.completion_state = None
+    self.overload_state = None
+    self.selection = None
+    let line = line_from_buffers(state.left, state.right)
+    self.history.track_submission(line)
+    self.console.write_line("")
+    self.cancel_controller.set_mode(AllowCancelSignal)
+    return Return(PromptResult::submitted(line, info))
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_edit_keys(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  if key_bindings.backward_delete_character.matches(info) {
+    if self.selection is Some(_) {
+      self.delete_selection(state.left, state.right)
+    } else if state.left.pop() is Some(_) {
+      if self.completion_state is Some(completion_state) {
+        update_completion_filter(completion_state, state.left)
+      }
+    }
+    self.track_undo(state.left, state.right)
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.delete_character.matches(info) {
+    if self.selection is Some(_) {
+      self.delete_selection(state.left, state.right)
+    } else {
+      ignore(state.right.pop())
+    }
+    self.track_undo(state.left, state.right)
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_left.matches(info) {
+    self.selection = None
+    if state.left.pop() is Some(ch) {
+      state.right.push(ch)
+    }
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_right.matches(info) {
+    self.selection = None
+    if state.right.pop() is Some(ch) {
+      state.left.push(ch)
+    }
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_home.matches(info) {
+    self.selection = None
+    while state.left.pop() is Some(ch) {
+      state.right.push(ch)
+    }
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  if key_bindings.move_end.matches(info) {
+    self.selection = None
+    while state.right.pop() is Some(ch) {
+      state.left.push(ch)
+    }
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  NotHandled
+}
+
+///|
+async fn Prompt::handle_character_input(
+  self : Prompt,
+  prompt : FormattedString,
+  state : InputState,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  let ch = info.key_char
+  if !ch.is_control() {
+    self.delete_selection(state.left, state.right)
+    state.left.push(ch)
+    if self.completion_state is Some(completion_state) {
+      update_completion_filter(completion_state, state.left)
+    } else if ch == '.' {
+      let raw_line = line_from_buffers(state.left, state.right)
+      let items = (self.configuration.completer)(raw_line, state.left.length())
+      if items.length() > 0 {
+        self.completion_state = Some(CompletionState::new(items, ""))
+      }
+    } else if ch == '(' {
+      let raw_line = line_from_buffers(state.left, state.right)
+      let overloads = (self.configuration.overload_provider)(
+        raw_line,
+        state.left.length(),
+      )
+      if overloads.length() > 0 {
+        self.overload_state = Some(OverloadState::new(overloads))
+      }
+    }
+    self.track_undo(state.left, state.right)
+    self.render_line(prompt, state.left, state.right)
+    state.last_was_yank = false
+    return Handled
+  }
+  state.last_was_yank = false
+  NotHandled
+}
+
+///|
+fn cycle_previous_index(index : Int, length : Int) -> Int {
+  if length == 0 {
+    0
+  } else {
+    (index + length - 1) % length
+  }
+}
+
+///|
+fn cycle_next_index(index : Int, length : Int) -> Int {
+  if length == 0 {
+    0
+  } else {
+    (index + 1) % length
+  }
 }
 
 ///|
