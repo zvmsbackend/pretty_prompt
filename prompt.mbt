@@ -45,7 +45,7 @@ pub async fn Prompt::read_line_with_prompt(
     for key_press in key_presses {
       if key_press.pasted_text is Some(pasted) {
         left.push_iter(pasted.iter())
-        render_line(self.console, prompt, left, right)
+        self.render_line(prompt, left, right)
         continue
       }
 
@@ -60,7 +60,7 @@ pub async fn Prompt::read_line_with_prompt(
         if self.history.navigate_previous(line_from_buffers(left, right))
           is Some(entry) {
           set_line_buffers(left, right, entry)
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -68,7 +68,7 @@ pub async fn Prompt::read_line_with_prompt(
       if key_bindings.history_next.matches(info) {
         if self.history.navigate_next() is Some(entry) {
           set_line_buffers(left, right, entry)
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -88,14 +88,14 @@ pub async fn Prompt::read_line_with_prompt(
 
       if key_bindings.backward_delete_character.matches(info) {
         if left.pop() is Some(_) {
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
 
       if key_bindings.delete_character.matches(info) {
         if right.pop() is Some(_) {
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -103,7 +103,7 @@ pub async fn Prompt::read_line_with_prompt(
       if key_bindings.move_left.matches(info) {
         if left.pop() is Some(ch) {
           right.push(ch)
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -111,7 +111,7 @@ pub async fn Prompt::read_line_with_prompt(
       if key_bindings.move_right.matches(info) {
         if right.pop() is Some(ch) {
           left.push(ch)
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -135,7 +135,7 @@ pub async fn Prompt::read_line_with_prompt(
           }
         }
         if changed {
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -159,7 +159,7 @@ pub async fn Prompt::read_line_with_prompt(
           }
         }
         if changed {
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -182,7 +182,7 @@ pub async fn Prompt::read_line_with_prompt(
           }
         }
         if changed {
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -205,7 +205,7 @@ pub async fn Prompt::read_line_with_prompt(
           }
         }
         if changed {
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -217,7 +217,7 @@ pub async fn Prompt::read_line_with_prompt(
           changed = true
         }
         if changed {
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -229,7 +229,7 @@ pub async fn Prompt::read_line_with_prompt(
           changed = true
         }
         if changed {
-          render_line(self.console, prompt, left, right)
+          self.render_line(prompt, left, right)
         }
         continue
       }
@@ -237,7 +237,7 @@ pub async fn Prompt::read_line_with_prompt(
       let ch = info.key_char
       if !ch.is_control() {
         left.push(ch)
-        render_line(self.console, prompt, left, right)
+        self.render_line(prompt, left, right)
       }
     }
   }
@@ -275,19 +275,22 @@ fn line_from_buffers(left : Array[Char], right : Array[Char]) -> String {
 }
 
 ///|
-fn render_line(
-  console : &ConsolePort,
+async fn Prompt::render_line(
+  self : Prompt,
   prompt : String,
   left : Array[Char],
   right : Array[Char],
 ) -> Unit {
-  console.write("\r")
-  console.write(prompt)
-  console.write(line_from_buffers(left, right))
-  console.write("\u{1b}[K")
+  self.console.write("\r")
+  self.console.write(prompt)
+  let raw_line = line_from_buffers(left, right)
+  let spans = (self.configuration.highlighter)(raw_line)
+  let highlighted_line = apply_highlights(raw_line, spans)
+  self.console.write(highlighted_line)
+  self.console.write("\u{1b}[K")
   let right_width = get_chars_width(right.iter())
   if right_width > 0 {
-    console.write("\u{1b}[\{right_width}D")
+    self.console.write("\u{1b}[\{right_width}D")
   }
 }
 

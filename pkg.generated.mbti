@@ -7,6 +7,8 @@ import {
 }
 
 // Values
+pub fn apply_highlights(String, Array[FormatSpan]) -> String
+
 pub fn get_char_width(Char) -> Int
 
 pub fn get_chars_width(Iter[Char]) -> Int
@@ -27,6 +29,28 @@ pub impl Eq for ClipboardPortError
 pub impl Show for ClipboardPortError
 
 // Types and methods
+pub(all) enum AnsiColor {
+  Default
+  Black
+  Red
+  Green
+  Yellow
+  Blue
+  Magenta
+  Cyan
+  White
+  BrightBlack
+  BrightRed
+  BrightGreen
+  BrightYellow
+  BrightBlue
+  BrightMagenta
+  BrightCyan
+  BrightWhite
+  Color256(Int)
+  Rgb(Int, Int, Int)
+}
+
 pub struct CancelController {
   console : &ConsolePort
   cancellation_requested : @ref.Ref[Bool]
@@ -38,12 +62,29 @@ pub fn CancelController::new(&ConsolePort) -> Self
 pub fn CancelController::set_mode(Self, ControlCMode) -> Unit
 pub fn CancelController::take_cancellation_requested(Self) -> Bool
 
+pub struct ConsoleFormat {
+  foreground : AnsiColor
+  background : AnsiColor
+  bold : Bool
+  italic : Bool
+  underline : Bool
+}
+pub fn ConsoleFormat::default() -> Self
+pub fn ConsoleFormat::new(foreground? : AnsiColor, background? : AnsiColor, bold? : Bool, italic? : Bool, underline? : Bool) -> Self
+
 pub(all) enum ControlCMode {
   CaptureAsInput
   AllowCancelSignal
 }
 pub impl Eq for ControlCMode
 pub impl Show for ControlCMode
+
+pub struct FormatSpan {
+  start : Int
+  length : Int
+  format : ConsoleFormat
+}
+pub fn FormatSpan::new(Int, Int, ConsoleFormat) -> Self
 
 pub struct HistoryConfiguration {
   persistent_history_filepath : String?
@@ -127,9 +168,10 @@ pub struct PromptConfiguration {
   prompt : String
   key_bindings : KeyBindings
   history : HistoryConfiguration
+  highlighter : async (String) -> Array[FormatSpan]
 }
 pub fn PromptConfiguration::default() -> Self
-pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration) -> Self
+pub fn PromptConfiguration::new(prompt? : String, key_bindings? : KeyBindings, history? : HistoryConfiguration, highlighter? : async (String) -> Array[FormatSpan]) -> Self
 
 pub struct PromptResult {
   is_success : Bool

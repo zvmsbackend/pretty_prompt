@@ -211,6 +211,7 @@ pub struct PromptConfiguration {
   prompt : String
   key_bindings : KeyBindings
   history : HistoryConfiguration
+  highlighter : async (String) -> Array[FormatSpan]
 }
 
 ///|
@@ -218,8 +219,9 @@ pub fn PromptConfiguration::new(
   prompt? : String = "> ",
   key_bindings? : KeyBindings = KeyBindings::default(),
   history? : HistoryConfiguration = HistoryConfiguration::default(),
+  highlighter? : async (String) -> Array[FormatSpan] = _ => [],
 ) -> PromptConfiguration {
-  { prompt, key_bindings, history }
+  { prompt, key_bindings, history, highlighter }
 }
 
 ///|

@@ -1,6 +1,7 @@
 import {
   "moonbitlang/core/encoding/utf8",
   "moonbitlang/core/ref",
+  "moonbitlang/core/cmp",
   "moonbitlang/x/codec/base64",
   "moonbitlang/async/fs",
   "sennenki/console",
