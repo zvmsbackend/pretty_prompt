@@ -191,8 +191,9 @@ fn render_line(
   console.write(prompt)
   console.write(line_from_buffers(left, right))
   console.write("\u{1b}[K")
-  if right.length() > 0 {
-    console.write("\u{1b}[\{right.length()}D")
+  let right_width = get_chars_width(right.iter())
+  if right_width > 0 {
+    console.write("\u{1b}[\{right_width}D")
   }
 }
 
