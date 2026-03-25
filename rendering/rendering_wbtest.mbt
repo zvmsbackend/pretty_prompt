@@ -247,6 +247,21 @@ test "render_diff skips placeholder sentinel cell" {
 }
 
 ///|
+test "render_diff clears rows removed from previous frame" {
+  let console = RenderingConsole::new()
+  let old_screen = Screen::new(2, 5)
+  let new_screen = Screen::new(1, 5)
+  old_screen.draw_string(1, 0, "menu", ConsoleFormat::default())
+  old_screen.set_cursor(0, 0)
+  new_screen.set_cursor(0, 0)
+
+  render_diff(console, new_screen, old_screen, 1, 1)
+
+  assert_true(console.output.contains("\u{1b}[1B"))
+  assert_true(console.output.contains("    "))
+}
+
+///|
 test "unicode width covers control box and wide-range branches" {
   assert_eq(get_char_width('\u{007f}'), 0)
   assert_eq(get_char_width('\u{2501}'), 1)

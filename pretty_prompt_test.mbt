@@ -1276,3 +1276,88 @@ async test "prompt dot character triggers completer path" {
 
   prompt.dispose()
 }
+
+///|
+async test "prompt completion closes at word boundary" {
+  let callbacks = @pretty_prompt.PromptCallbacks::new(
+    completion_items_provider=_ => [CompletionItem::new("method")],
+    should_open_completion_window=_ => false,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('\t', @console.Tab),
+    key(' ', @console.Space),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "a ")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt completion reopens on dot after boundary" {
+  let callbacks = @pretty_prompt.PromptCallbacks::new(completion_items_provider=_ => {
+    [CompletionItem::new("method")]
+  })
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('\t', @console.Tab),
+    key('.', @console.A),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "a.method")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt completion can reopen after empty result and backspace" {
+  let callbacks = @pretty_prompt.PromptCallbacks::new(
+    completion_items_provider=req => {
+      if req.snapshot.text == "ab" {
+        []
+      } else {
+        [CompletionItem::new("alpha", filter_text="a")]
+      }
+    },
+    should_open_completion_window=_ => false,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('\t', @console.Tab),
+    key('\u0008', @console.Backspace),
+    key('\n', @console.Enter),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "alpha")
+
+  prompt.dispose()
+}

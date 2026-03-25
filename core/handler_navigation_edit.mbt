@@ -147,18 +147,17 @@ fn Prompt::run_undo_redo_handler(
 }
 
 ///|
-fn Prompt::run_edit_keys_handler(
+async fn Prompt::run_edit_keys_handler(
   self : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
+  let info = key_press.console_key_info
   if key_bindings.backward_delete_word.matches(info) {
     self.pane_state.selection = None
     if self.delete_word_left(state.left, state.right) {
-      if self.pane_state.completion_state is Some(completion_state) {
-        update_completion_filter(completion_state, state.left)
-      }
+      self.recompute_completion_after_edit(state)
       self.track_undo(state.left, state.right)
       state.request_render()
     }
@@ -168,6 +167,7 @@ fn Prompt::run_edit_keys_handler(
   if key_bindings.delete_word.matches(info) {
     self.pane_state.selection = None
     if self.delete_word_right(state.left, state.right) {
+      self.recompute_completion_after_edit(state)
       self.track_undo(state.left, state.right)
       state.request_render()
     }
@@ -192,11 +192,11 @@ fn Prompt::run_edit_keys_handler(
   }
   if key_bindings.backward_delete_character.matches(info) {
     if self.pane_state.selection is Some(_) {
-      self.delete_selection(state.left, state.right)
+      self
+      ..delete_selection(state.left, state.right)
+      .recompute_completion_after_edit(state)
     } else if state.left.pop() is Some(_) {
-      if self.pane_state.completion_state is Some(completion_state) {
-        update_completion_filter(completion_state, state.left)
-      }
+      self.recompute_completion_after_edit(state)
     }
     self.track_undo(state.left, state.right)
     state.request_render()
@@ -205,9 +205,11 @@ fn Prompt::run_edit_keys_handler(
   }
   if key_bindings.delete_character.matches(info) {
     if self.pane_state.selection is Some(_) {
-      self.delete_selection(state.left, state.right)
-    } else {
-      ignore(state.right.pop())
+      self
+      ..delete_selection(state.left, state.right)
+      .recompute_completion_after_edit(state)
+    } else if state.right.pop() is Some(_) {
+      self.recompute_completion_after_edit(state)
     }
     self.track_undo(state.left, state.right)
     state.request_render()
@@ -267,58 +269,55 @@ async fn Prompt::run_character_input_handler(
     self.apply_format_input(state, key_press)
 
     let snapshot = self.snapshot_of(state.left, state.right)
-    if self.pane_state.completion_state is Some(completion_state) {
-      let span = self.normalize_completion_span(
-        snapshot,
-        (self.configuration.callbacks.completion_span_provider)(snapshot),
-      )
-      let prefix = if span.contains_caret(snapshot.caret) {
-        snapshot.text.sub(start=span.start, end=snapshot.caret).to_string()
-      } else {
-        ""
-      }
-      completion_state.filter(prefix)
+    let span = self.normalize_completion_span(
+      snapshot,
+      (self.configuration.callbacks.completion_span_provider)(snapshot),
+    )
+    let prefix = if span.contains_caret(snapshot.caret) {
+      snapshot.text.sub(start=span.start, end=snapshot.caret).to_string()
     } else {
-      let should_open = (self.configuration.callbacks.should_open_completion_window)(
-        CompletionTriggerContext::new(snapshot, key_press),
-      )
-      if should_open {
-        let span = self.normalize_completion_span(
-          snapshot,
-          (self.configuration.callbacks.completion_span_provider)(snapshot),
+      ""
+    }
+
+    if self.pane_state.completion_state is Some(completion_state) {
+      if prefix is "" {
+        self.pane_state.completion_state = None
+        self.try_open_completion_from_snapshot(
+          snapshot, span, prefix, key_press,
         )
-        let items = (self.configuration.callbacks.completion_items_provider)(
-          CompletionRequest::new(snapshot, span),
-        )
-        if items.length() > 0 {
-          let prefix = if span.contains_caret(snapshot.caret) {
-            snapshot.text.sub(start=span.start, end=snapshot.caret).to_string()
-          } else {
-            ""
+      } else {
+        completion_state.filter(prefix)
+        match completion_state.items {
+          [] => {
+            self.pane_state.completion_state = None
+            self.try_open_completion_from_snapshot(
+              snapshot, span, prefix, key_press,
+            )
           }
-          self.pane_state.completion_state = Some(
-            CompletionState::new(items, prefix),
-          )
+          _ => ()
         }
       }
+    } else {
+      self.try_open_completion_from_snapshot(snapshot, span, prefix, key_press)
     }
 
     let (overloads, selected_index) = (self.configuration.callbacks.overload_provider)(
       snapshot,
     )
-    if overloads.length() > 0 {
-      let overload_state = OverloadState::new(overloads)
-      let normalized_index = if selected_index < 0 {
-        0
-      } else if selected_index >= overload_state.items.length() {
-        overload_state.items.length() - 1
-      } else {
-        selected_index
+    match overloads {
+      [] => self.pane_state.overload_state = None
+      _ => {
+        let overload_state = OverloadState::new(overloads)
+        let normalized_index = if selected_index < 0 {
+          0
+        } else if selected_index >= overload_state.items.length() {
+          overload_state.items.length() - 1
+        } else {
+          selected_index
+        }
+        overload_state.set_selected_index(normalized_index)
+        self.pane_state.overload_state = Some(overload_state)
       }
-      overload_state.set_selected_index(normalized_index)
-      self.pane_state.overload_state = Some(overload_state)
-    } else {
-      self.pane_state.overload_state = None
     }
 
     self.track_undo(state.left, state.right)
@@ -328,4 +327,64 @@ async fn Prompt::run_character_input_handler(
   }
   state.last_was_yank = false
   NotHandled
+}
+
+///|
+async fn Prompt::try_open_completion_from_snapshot(
+  self : Prompt,
+  snapshot : PromptSnapshot,
+  span : CompletionSpan,
+  prefix : String,
+  key_press : KeyPress,
+) -> Unit {
+  let should_open = (self.configuration.callbacks.should_open_completion_window)(
+    CompletionTriggerContext::new(snapshot, key_press),
+  )
+  if !should_open {
+    return
+  }
+
+  let items = (self.configuration.callbacks.completion_items_provider)(
+    CompletionRequest::new(snapshot, span),
+  )
+  match items {
+    [] => return
+    _ =>
+      self.pane_state.completion_state = Some(
+        CompletionState::new(items, prefix),
+      )
+  }
+}
+
+///|
+async fn Prompt::recompute_completion_after_edit(
+  self : Prompt,
+  state : InputState,
+) -> Unit {
+  let snapshot = self.snapshot_of(state.left, state.right)
+  let span = self.normalize_completion_span(
+    snapshot,
+    (self.configuration.callbacks.completion_span_provider)(snapshot),
+  )
+  let prefix = if span.contains_caret(snapshot.caret) {
+    snapshot.text.sub(start=span.start, end=snapshot.caret).to_string()
+  } else {
+    ""
+  }
+
+  if prefix is "" {
+    self.pane_state.completion_state = None
+    return
+  }
+
+  let items = (self.configuration.callbacks.completion_items_provider)(
+    CompletionRequest::new(snapshot, span),
+  )
+  match items {
+    [] => self.pane_state.completion_state = None
+    _ =>
+      self.pane_state.completion_state = Some(
+        CompletionState::new(items, prefix),
+      )
+  }
 }

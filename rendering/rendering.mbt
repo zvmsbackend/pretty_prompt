@@ -130,17 +130,37 @@ pub fn render_diff(
     cursor_col = 0
   }
 
-  for r in 0..<new_screen.height {
-    for c in 0..<new_screen.width {
-      let new_cell = new_screen.rows[r][c]
-      let old_cell = if r < old_screen.height && c < old_screen.width {
+  let max_height = if new_screen.height > old_screen.height {
+    new_screen.height
+  } else {
+    old_screen.height
+  }
+  let max_width = if new_screen.width > old_screen.width {
+    new_screen.width
+  } else {
+    old_screen.width
+  }
+  for r in 0..<max_height {
+    for c in 0..<max_width {
+      let has_new_cell = r < new_screen.height && c < new_screen.width
+      let has_old_cell = r < old_screen.height && c < old_screen.width
+      if !has_new_cell && !has_old_cell {
+        continue
+      }
+
+      let new_cell = if has_new_cell {
+        new_screen.rows[r][c]
+      } else {
+        Cell::default()
+      }
+      let old_cell = if has_old_cell {
         old_screen.rows[r][c]
       } else {
         Cell::default()
       }
 
       if new_cell != old_cell {
-        if new_cell.char == '\u{0000}' {
+        if has_new_cell && new_cell.char == '\u{0000}' {
           continue
         }
 

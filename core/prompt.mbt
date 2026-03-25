@@ -338,13 +338,13 @@ async fn Prompt::handle_submit_or_cancel(
 }
 
 ///|
-fn Prompt::handle_edit_keys(
+async fn Prompt::handle_edit_keys(
   self : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
-  self.run_edit_keys_handler(state, key_bindings, info)
+  self.run_edit_keys_handler(state, key_bindings, key_press)
 }
 
 ///|
@@ -560,15 +560,6 @@ fn Prompt::set_line_buffers(
   left.clear()
   right.clear()
   left.push_iter(text.iter())
-}
-
-///|
-fn update_completion_filter(
-  state : CompletionState,
-  left : Array[Char],
-) -> Unit {
-  let prefix_chars = left.rev_iter().take_while(is_word_character).collect()
-  state.filter(String::from_array(prefix_chars.rev()))
 }
 
 ///|

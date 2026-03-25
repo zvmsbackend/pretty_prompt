@@ -120,7 +120,8 @@ impl Pane for PaneEntry with on_key(self, context, phase) {
           )
         SubmitOrCancelHandler =>
           runtime.handle_submit_or_cancel(state, key_bindings, key_press)
-        EditKeysHandler => runtime.handle_edit_keys(state, key_bindings, info)
+        EditKeysHandler =>
+          runtime.handle_edit_keys(state, key_bindings, key_press)
         CharacterInputHandler =>
           runtime.handle_character_input(state, key_press)
       }
