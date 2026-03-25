@@ -95,6 +95,7 @@ pub async fn Prompt::read_line_with_prompt(
   self.cancel_controller.set_mode(CaptureAsInput)
   self.last_screen = None
   self.render_anchor = None
+  self.reserve_space_for_helper_panes()
   let state = InputState::new()
   let key_bindings = self.configuration.key_bindings
   self.render_line(prompt, state.left, state.right)
@@ -119,6 +120,26 @@ pub async fn Prompt::read_line_with_prompt(
     }
   }
   cancel_result()
+}
+
+///|
+fn Prompt::reserve_space_for_helper_panes(self : Prompt) -> Unit {
+  let desired_helper_rows = self.configuration.max_completion_items_count + 3
+  let cursor_in_window = self.console.get_cursor_top() -
+    self.console.get_window_top()
+  let rows_below_cursor = self.console.get_window_height() -
+    (cursor_in_window + 1)
+  let extra_rows = desired_helper_rows - rows_below_cursor
+  if extra_rows <= 0 {
+    return
+  }
+
+  self.console.write(
+    "\n".repeat(extra_rows) +
+    "\u{1b}[\{extra_rows}A" +
+    "\u{1b}[1G" +
+    "\u{1b}[0m",
+  )
 }
 
 ///|
@@ -640,8 +661,10 @@ async fn Prompt::render_line(
     None => 0
   }
 
-  let cursor_in_window = self.console.get_cursor_top() - self.console.get_window_top()
-  let rows_below_cursor = self.console.get_window_height() - (cursor_in_window + 1)
+  let cursor_in_window = self.console.get_cursor_top() -
+    self.console.get_window_top()
+  let rows_below_cursor = self.console.get_window_height() -
+    (cursor_in_window + 1)
   let input_rows_below_cursor = wrapped.lines.length() - wrapped.cursor_row - 1
   let helper_rows_budget = rows_below_cursor - input_rows_below_cursor
   let helper_rows_budget = if helper_rows_budget > 0 {
@@ -656,12 +679,12 @@ async fn Prompt::render_line(
     helper_rows_budget
   }
   let completion_rows_budget = helper_rows_budget - overload_items_count
-  let completion_items_count =
-    if raw_completion_items_count < completion_rows_budget {
-      raw_completion_items_count
-    } else {
-      completion_rows_budget
-    }
+  let completion_items_count = if raw_completion_items_count <
+    completion_rows_budget {
+    raw_completion_items_count
+  } else {
+    completion_rows_budget
+  }
 
   let height = wrapped.lines.length() +
     completion_items_count +
