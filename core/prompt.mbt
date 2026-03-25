@@ -309,6 +309,16 @@ fn Prompt::handle_selection_clipboard(
 }
 
 ///|
+fn Prompt::handle_paste(
+  self : Prompt,
+  state : InputState,
+  key_bindings : KeyBindings,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  self.run_paste_handler(state, key_bindings, info)
+}
+
+///|
 fn Prompt::handle_kill_ring(
   self : Prompt,
   state : InputState,

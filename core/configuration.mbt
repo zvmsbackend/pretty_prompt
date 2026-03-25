@@ -362,6 +362,7 @@ pub struct KeyBindings {
   yank : KeyPressPatterns
   yank_pop : KeyPressPatterns
   reverse_search : KeyPressPatterns
+  paste : KeyPressPatterns
 }
 
 ///|
@@ -523,6 +524,13 @@ let default_reverse_search_patterns : KeyPressPatterns = @console.R
   |> KeyPressPatterns::single
 
 ///|
+let default_paste_patterns : KeyPressPatterns = KeyPressPatterns::new([
+  KeyPressPattern::new(V, control=true),
+  KeyPressPattern::new(Insert, shift=true),
+  KeyPressPattern::new(V, control=true, shift=true),
+])
+
+///|
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns,
   new_line? : KeyPressPatterns = default_new_line_patterns,
@@ -554,6 +562,7 @@ pub fn KeyBindings::new(
   yank? : KeyPressPatterns = default_yank_patterns,
   yank_pop? : KeyPressPatterns = default_yank_pop_patterns,
   reverse_search? : KeyPressPatterns = default_reverse_search_patterns,
+  paste? : KeyPressPatterns = default_paste_patterns,
 ) -> KeyBindings {
   {
     submit_prompt,
@@ -586,6 +595,7 @@ pub fn KeyBindings::new(
     yank,
     yank_pop,
     reverse_search,
+    paste,
   }
 }
 

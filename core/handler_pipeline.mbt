@@ -42,6 +42,7 @@ priv enum PaneEntry {
   NavigationModesHandler
   SearchTriggerHandler
   SelectionClipboardHandler
+  PasteHandler
   KillRingHandler
   SelectionMovementHandler
   UndoRedoHandler
@@ -110,6 +111,7 @@ impl Pane for PaneEntry with on_key(self, context, phase) {
           )
         SelectionClipboardHandler =>
           runtime.handle_selection_clipboard(state, key_bindings, info)
+        PasteHandler => runtime.handle_paste(state, key_bindings, info)
         KillRingHandler => runtime.handle_kill_ring(state, key_bindings, info)
         SelectionMovementHandler =>
           runtime.handle_selection_movement_keys(state, key_bindings, info)
@@ -136,6 +138,7 @@ fn default_pane_entries() -> Array[PaneEntry] {
     NavigationModesHandler,
     SearchTriggerHandler,
     SelectionClipboardHandler,
+    PasteHandler,
     KillRingHandler,
     SelectionMovementHandler,
     UndoRedoHandler,
