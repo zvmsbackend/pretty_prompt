@@ -59,7 +59,7 @@ fn dedent_and_filter_paste(text : String) -> String {
             line
           }
           let dedented = if line_without_cr.length() > min_indent {
-            line_without_cr[min_indent:line_without_cr.length() - min_indent]
+            line_without_cr[min_indent:]
           } else {
             line_without_cr
           }

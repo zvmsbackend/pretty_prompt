@@ -1407,3 +1407,67 @@ async test "prompt completion can reopen after empty result and backspace" {
 
   prompt.dispose()
 }
+
+///|
+async test "prompt paste dedent preserves right side of lines" {
+  let console = FakeInputConsole::new([
+    key('\u0016', @console.V, control=true),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("    line1 text\n    line2 text")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "line1 text\nline2 text")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt paste dedent with uniform indent removes prefix only" {
+  let console = FakeInputConsole::new([
+    key('\u0016', @console.V, control=true),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("        first line\n        second line")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "first line\nsecond line")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt paste no dedent when only one non-empty line" {
+  let console = FakeInputConsole::new([
+    key('\u0016', @console.V, control=true),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("only one line with indent")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "only one line with indent")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt paste handles CRLF line endings" {
+  let console = FakeInputConsole::new([
+    key('\u0016', @console.V, control=true),
+    key('\n', @console.Enter),
+  ])
+  let clipboard = FakeClipboard::new("    line1\r\n    line2\r\n    line3")
+  let prompt = @pretty_prompt.Prompt::new(console, clipboard)
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "line1\nline2\nline3")
+
+  prompt.dispose()
+}
