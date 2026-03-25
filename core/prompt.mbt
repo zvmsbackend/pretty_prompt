@@ -174,13 +174,39 @@ async fn Prompt::process_key_press(
     return self.commit_requested_render(prompt, state)
   }
 
-  self.run_pane_pipeline(
-    prompt,
-    state,
-    key_bindings,
-    transformed,
-    default_pane_pipeline(),
-  )
+  let result = self.try_handle_key_press_callbacks(state, info)
+  if result is NotHandled {
+    self.run_pane_pipeline(
+      prompt,
+      state,
+      key_bindings,
+      transformed,
+      default_pane_pipeline(),
+    )
+  } else {
+    result
+  }
+}
+
+///|
+async fn Prompt::try_handle_key_press_callbacks(
+  self : Prompt,
+  state : InputState,
+  info : @console.ConsoleKeyInfo,
+) -> KeyProcessingResult {
+  let callbacks = self.configuration.callbacks.key_press_callbacks
+  for callback in callbacks {
+    if callback.pattern.matches(info) {
+      let snapshot = self.snapshot_of(state.left, state.right)
+      let result = (callback.callback)(snapshot)
+      match result {
+        KeyPressCallbackResult::StayOnPrompt => return Handled
+        KeyPressCallbackResult::SubmitPrompt(text~) =>
+          return Return(PromptResult::submitted(text, info))
+      }
+    }
+  }
+  NotHandled
 }
 
 ///|

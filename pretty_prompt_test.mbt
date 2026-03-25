@@ -1471,3 +1471,31 @@ async test "prompt paste handles CRLF line endings" {
 
   prompt.dispose()
 }
+
+///|
+async test "prompt key press callback stay on prompt" {
+  let callbacks = @pretty_prompt.PromptCallbacks::new(key_press_callbacks=[
+    @pretty_prompt.KeyPressCallback::new(
+      @pretty_prompt.KeyPressPattern::new(@console.F1),
+      _ => @pretty_prompt.KeyPressCallbackResult::StayOnPrompt,
+    ),
+  ])
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('b', @console.B),
+    key('\u0000', @console.F1),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "ab")
+
+  prompt.dispose()
+}
