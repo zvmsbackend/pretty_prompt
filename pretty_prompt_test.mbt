@@ -655,6 +655,52 @@ async test "prompt read_line uses custom submit key binding" {
 }
 
 ///|
+async test "prompt control enter inserts newline" {
+  let console = FakeInputConsole::new([
+    key('a', @console.A),
+    key('\n', @console.Enter, control=true),
+    key('b', @console.B),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(console, FakeClipboard::new(""))
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "a\nb")
+
+  prompt.dispose()
+}
+
+///|
+async test "prompt soft newline callback can override enter" {
+  let callbacks = @pretty_prompt.PromptCallbacks::new(should_insert_soft_newline=(
+    snapshot,
+    key_press,
+  ) => {
+    let _ = key_press
+    snapshot.text.contains("{") && !snapshot.text.contains("}")
+  })
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
+  let console = FakeInputConsole::new([
+    key('{', @console.A),
+    key('\n', @console.Enter),
+    key('}', @console.A),
+    key('\n', @console.Enter),
+  ])
+  let prompt = @pretty_prompt.Prompt::new(
+    console,
+    FakeClipboard::new(""),
+    configuration~,
+  )
+
+  let result = prompt.read_line()
+  assert_true(result.is_success)
+  assert_eq(result.text, "{\n}")
+
+  prompt.dispose()
+}
+
+///|
 async test "prompt history recalls previous entry" {
   let console = FakeInputConsole::new([
     key('f', @console.F),

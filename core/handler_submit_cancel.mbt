@@ -25,7 +25,19 @@ async fn Prompt::run_submit_or_cancel_handler(
     return Return(self.run_cancel_prompt_handler(info))
   }
 
+  if key_bindings.new_line.matches(info) {
+    return self.insert_soft_newline(state)
+  }
+
   if key_bindings.submit_prompt.matches(info) {
+    let snapshot = self.snapshot_of(state.left, state.right)
+    let should_insert_soft_newline = (self.configuration.callbacks.should_insert_soft_newline)(
+      snapshot, key_press,
+    )
+    if should_insert_soft_newline {
+      return self.insert_soft_newline(state)
+    }
+
     self.pane_state.completion_state = None
     self.pane_state.overload_state = None
     self.pane_state.selection = None
@@ -36,4 +48,19 @@ async fn Prompt::run_submit_or_cancel_handler(
     return Return(PromptResult::submitted(line, info))
   }
   NotHandled
+}
+
+///|
+fn Prompt::insert_soft_newline(
+  self : Prompt,
+  state : InputState,
+) -> KeyProcessingResult {
+  self.pane_state.completion_state = None
+  self.pane_state.overload_state = None
+  self.delete_selection(state.left, state.right)
+  state.left.push('\n')
+  self.track_undo(state.left, state.right)
+  state.request_render()
+  state.last_was_yank = false
+  Handled
 }

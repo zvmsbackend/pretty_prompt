@@ -161,6 +161,7 @@ pub struct PromptCallbacks {
   should_open_completion_window : async (CompletionTriggerContext) -> Bool
   transform_key_press : async (KeyTransformContext) -> KeyPress
   confirm_completion_commit : async (CompletionCommitContext) -> Bool
+  should_insert_soft_newline : async (PromptSnapshot, KeyPress) -> Bool
   format_input : async (FormatInputContext) -> (String, Int)
   overload_provider : async (PromptSnapshot) -> (Array[OverloadItem], Int)
 }
@@ -235,6 +236,10 @@ pub fn PromptCallbacks::new(
   confirm_completion_commit? : async (CompletionCommitContext) -> Bool = _ => {
     true
   },
+  should_insert_soft_newline? : async (PromptSnapshot, KeyPress) -> Bool = (
+    _,
+    _,
+  ) => false,
   format_input? : async (FormatInputContext) -> (String, Int) = ctx => {
     (ctx.snapshot.text, ctx.snapshot.caret)
   },
@@ -250,6 +255,7 @@ pub fn PromptCallbacks::new(
     should_open_completion_window,
     transform_key_press,
     confirm_completion_commit,
+    should_insert_soft_newline,
     format_input,
     overload_provider,
   }
@@ -327,6 +333,7 @@ pub fn KeyPressPatterns::matches(
 ///|
 pub struct KeyBindings {
   submit_prompt : KeyPressPatterns
+  new_line : KeyPressPatterns
   cancel_prompt : KeyPressPatterns
   history_previous : KeyPressPatterns
   history_next : KeyPressPatterns
@@ -363,6 +370,11 @@ let default_submit_prompt_patterns : KeyPressPatterns = KeyPressPatterns::new([
   KeyPressPattern::new(Enter, control=true),
   KeyPressPattern::new(Enter, alt=true, control=true),
 ])
+
+///|
+let default_new_line_patterns : KeyPressPatterns = KeyPressPatterns::single(
+  KeyPressPattern::new(Enter, control=true),
+)
 
 ///|
 let default_cancel_prompt_patterns : KeyPressPatterns = KeyPressPatterns::single(
@@ -513,6 +525,7 @@ let default_reverse_search_patterns : KeyPressPatterns = @console.R
 ///|
 pub fn KeyBindings::new(
   submit_prompt? : KeyPressPatterns = default_submit_prompt_patterns,
+  new_line? : KeyPressPatterns = default_new_line_patterns,
   cancel_prompt? : KeyPressPatterns = default_cancel_prompt_patterns,
   history_previous? : KeyPressPatterns = default_history_previous_patterns,
   history_next? : KeyPressPatterns = default_history_next_patterns,
@@ -544,6 +557,7 @@ pub fn KeyBindings::new(
 ) -> KeyBindings {
   {
     submit_prompt,
+    new_line,
     cancel_prompt,
     history_previous,
     history_next,
