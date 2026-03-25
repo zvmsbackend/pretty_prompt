@@ -93,11 +93,11 @@ pub async fn Prompt::read_line_with_prompt(
   prompt : FormattedString,
 ) -> PromptResult {
   self.cancel_controller.set_mode(CaptureAsInput)
-  self.console.write(prompt.text)
   self.last_screen = None
   self.render_anchor = None
   let state = InputState::new()
   let key_bindings = self.configuration.key_bindings
+  self.render_line(prompt, state.left, state.right)
 
   while true {
     if self.cancel_controller.take_cancellation_requested() {
