@@ -621,7 +621,7 @@ async fn Prompt::render_line(
   )
 
   // 2. Calculate heights
-  let completion_items_count = match self.pane_state.completion_state {
+  let raw_completion_items_count = match self.pane_state.completion_state {
     Some(state) =>
       if state.items.length() < max_items {
         state.items.length()
@@ -630,7 +630,7 @@ async fn Prompt::render_line(
       }
     None => 0
   }
-  let overload_items_count = match self.pane_state.overload_state {
+  let raw_overload_items_count = match self.pane_state.overload_state {
     Some(state) =>
       if state.items.length() < 3 {
         state.items.length()
@@ -639,6 +639,30 @@ async fn Prompt::render_line(
       }
     None => 0
   }
+
+  let cursor_in_window = self.console.get_cursor_top() - self.console.get_window_top()
+  let rows_below_cursor = self.console.get_window_height() - (cursor_in_window + 1)
+  let input_rows_below_cursor = wrapped.lines.length() - wrapped.cursor_row - 1
+  let helper_rows_budget = rows_below_cursor - input_rows_below_cursor
+  let helper_rows_budget = if helper_rows_budget > 0 {
+    helper_rows_budget
+  } else {
+    0
+  }
+
+  let overload_items_count = if raw_overload_items_count < helper_rows_budget {
+    raw_overload_items_count
+  } else {
+    helper_rows_budget
+  }
+  let completion_rows_budget = helper_rows_budget - overload_items_count
+  let completion_items_count =
+    if raw_completion_items_count < completion_rows_budget {
+      raw_completion_items_count
+    } else {
+      completion_rows_budget
+    }
+
   let height = wrapped.lines.length() +
     completion_items_count +
     overload_items_count
@@ -652,8 +676,7 @@ async fn Prompt::render_line(
   } else {
     []
   }
-  let sorted_spans = spans.copy()
-  sorted_spans.sort_by_key(span => span.start)
+  spans.sort_by_key(span => span.start)
 
   let active_prompt_spans = active_prompt.spans.copy()
   active_prompt_spans.sort_by_key(span => span.start)
@@ -678,7 +701,7 @@ async fn Prompt::render_line(
         } else {
           // Apply input text styles
           let i = current_text_pos - active_prompt_width
-          for span in sorted_spans {
+          for span in spans {
             if i >= span.start && i < span.start + span.length {
               format = span.format
               break
