@@ -397,6 +397,23 @@ test "read_key_presses keeps control burst as key presses" {
 }
 
 ///|
+test "read_key_presses ESC prefix is not treated as paste" {
+  let console = FakeInputConsole::new_with_batch(
+    [
+      key('\u001b', @console.Escape),
+      key('a', @console.A),
+      key('b', @console.B),
+      key('c', @console.C),
+    ],
+    true,
+  )
+  let key_presses = @pretty_prompt.read_key_presses(console)
+  assert_eq(key_presses.length(), 1)
+  assert_eq(key_presses[0].pasted_text, None)
+  assert_eq(key_presses[0].console_key_info.key_char, '\u001b')
+}
+
+///|
 test "key press patterns empty and has_any" {
   let empty = @pretty_prompt.KeyPressPatterns::empty()
   assert_false(empty.has_any())

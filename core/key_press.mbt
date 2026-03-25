@@ -34,6 +34,12 @@ pub fn read_key_presses(console : &ConsolePort) -> Array[KeyPress] {
     return [KeyPress::from_console_key_info(first)]
   }
 
+  // If first key is ESC, this is likely an Alt+Key combination
+  // (terminal sends ESC prefix for Alt-modified keys), not paste
+  if first.key_char == '\u001b' {
+    return [KeyPress::from_console_key_info(first)]
+  }
+
   let keys : Array[@console.ConsoleKeyInfo] = [first]
   while console.key_available() {
     keys.push(console.read_key(true))

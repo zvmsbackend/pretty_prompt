@@ -740,26 +740,31 @@ async fn Prompt::render_line(
   let active_prompt_spans = active_prompt.spans.copy()
   active_prompt_spans.sort_by_key(span => span.start)
 
-  let mut current_text_pos = 0
   for r in 0..<wrapped.lines.length() {
     let line_text = wrapped.lines[r]
     let mut line_col = 0
+    let mut char_index_on_line = 0
 
     for ch in line_text {
       let mut format = ConsoleFormat::default()
       if self.configuration.use_colors {
-        if current_text_pos < active_prompt_width {
+        let is_prompt_area = r == 0 && line_col < active_prompt_width
+        if is_prompt_area {
           // Apply prompt styles
           for span in active_prompt_spans {
-            if current_text_pos >= span.start &&
-              current_text_pos < span.start + span.length {
+            if char_index_on_line >= span.start &&
+              char_index_on_line < span.start + span.length {
               format = span.format
               break
             }
           }
         } else {
           // Apply input text styles
-          let i = current_text_pos - active_prompt_width
+          let i = if r == 0 {
+            char_index_on_line - active_prompt_width
+          } else {
+            char_index_on_line
+          }
           for span in spans {
             if i >= span.start && i < span.start + span.length {
               format = span.format
@@ -782,7 +787,7 @@ async fn Prompt::render_line(
         new_screen.rows[r][line_col + 1] = Cell::new('\u{0000}', format)
       }
       line_col = line_col + w
-      current_text_pos = current_text_pos + 1
+      char_index_on_line = char_index_on_line + 1
     }
   }
   new_screen.set_cursor(wrapped.cursor_row, wrapped.cursor_col)
