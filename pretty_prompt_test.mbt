@@ -401,9 +401,9 @@ test "key press patterns empty and has_any" {
   let empty = @pretty_prompt.KeyPressPatterns::empty()
   assert_false(empty.has_any())
 
-  let single = @pretty_prompt.KeyPressPatterns::single(
-    @pretty_prompt.KeyPressPattern::new(@console.A),
-  )
+  let single = @console.A
+    |> @pretty_prompt.KeyPressPattern::new
+    |> @pretty_prompt.KeyPressPatterns::single
   assert_true(single.has_any())
 }
 
@@ -683,9 +683,7 @@ async test "prompt history recalls previous entry" {
 ///|
 async test "prompt persistent history is loaded across prompt instances" {
   let history_path = "_build/pretty_prompt_history_test.log"
-  @fs.remove(history_path) catch {
-    _ => ()
-  }
+  ignore(try? Some(@fs.remove(history_path)))
 
   let history_config = @pretty_prompt.HistoryConfiguration::new(
     persistent_history_filepath=history_path,
@@ -728,9 +726,7 @@ async test "prompt persistent history is loaded across prompt instances" {
   assert_eq(loaded.text, "saved")
   reader_prompt.dispose()
 
-  @fs.remove(history_path) catch {
-    _ => ()
-  }
+  ignore(try? Some(@fs.remove(history_path)))
 }
 
 ///|
@@ -816,12 +812,16 @@ async test "prompt yank pop cycles after repeated kill-line-head" {
 
 ///|
 async test "prompt completion navigation accepts selected item" {
-  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
-    [
-      CompletionItem::new("ONE", filter_text="a1"),
-      CompletionItem::new("TWO", filter_text="za"),
-    ]
-  })
+  let callbacks = @pretty_prompt.PromptCallbacks::new(
+    completion_items_provider=_ => {
+      [
+        CompletionItem::new("ONE", filter_text="a1"),
+        CompletionItem::new("TWO", filter_text="za"),
+      ]
+    },
+    should_open_completion_window=_ => false,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('\t', @console.Tab),
@@ -942,12 +942,16 @@ async test "prompt supports undo and redo" {
 
 ///|
 async test "prompt completion panel handles previous and dismiss" {
-  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
-    [
-      CompletionItem::new("ONE", filter_text="a1"),
-      CompletionItem::new("TWO", filter_text="za"),
-    ]
-  })
+  let callbacks = @pretty_prompt.PromptCallbacks::new(
+    completion_items_provider=_ => {
+      [
+        CompletionItem::new("ONE", filter_text="a1"),
+        CompletionItem::new("TWO", filter_text="za"),
+      ]
+    },
+    should_open_completion_window=_ => false,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('\t', @console.Tab),
@@ -970,10 +974,10 @@ async test "prompt completion panel handles previous and dismiss" {
 
 ///|
 async test "prompt overload panel supports navigation keys" {
-  let configuration = @pretty_prompt.PromptConfiguration::new(overload_provider=(
-    _,
-    _,
-  ) => [OverloadItem::new("f(a)"), OverloadItem::new("f(a, b)")])
+  let callbacks = @pretty_prompt.PromptCallbacks::new(overload_provider=_ => {
+    ([OverloadItem::new("f(a)"), OverloadItem::new("f(a, b)")], 0)
+  })
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
   let console = FakeInputConsole::new([
     key('f', @console.F),
     key('(', @console.D9, shift=true),
@@ -1017,9 +1021,11 @@ async test "prompt handles paste burst as single input" {
 
 ///|
 async test "prompt updates completion filter after character delete" {
-  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
-    [CompletionItem::new("alpha")]
-  })
+  let callbacks = @pretty_prompt.PromptCallbacks::new(
+    completion_items_provider=_ => [CompletionItem::new("alpha")],
+    should_open_completion_window=_ => false,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('\t', @console.Tab),
@@ -1109,9 +1115,11 @@ async test "prompt selection move right and home selection" {
 
 ///|
 async test "prompt completion accept removes right-side word" {
-  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
-    [CompletionItem::new("X", filter_text="ab")]
-  })
+  let callbacks = @pretty_prompt.PromptCallbacks::new(
+    completion_items_provider=_ => [CompletionItem::new("X", filter_text="ab")],
+    should_open_completion_window=_ => false,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('b', @console.B),
@@ -1191,9 +1199,11 @@ async test "prompt move right branch keeps text" {
 
 ///|
 async test "prompt character input updates completion filter when open" {
-  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
-    [CompletionItem::new("alpha")]
-  })
+  let callbacks = @pretty_prompt.PromptCallbacks::new(
+    completion_items_provider=_ => [CompletionItem::new("alpha")],
+    should_open_completion_window=_ => false,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('\t', @console.Tab),
@@ -1216,9 +1226,11 @@ async test "prompt character input updates completion filter when open" {
 
 ///|
 async test "prompt backward delete word updates completion filter" {
-  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
-    [CompletionItem::new("alpha")]
-  })
+  let callbacks = @pretty_prompt.PromptCallbacks::new(
+    completion_items_provider=_ => [CompletionItem::new("alpha")],
+    should_open_completion_window=_ => false,
+  )
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('b', @console.B),
@@ -1242,9 +1254,10 @@ async test "prompt backward delete word updates completion filter" {
 
 ///|
 async test "prompt dot character triggers completer path" {
-  let configuration = @pretty_prompt.PromptConfiguration::new(completer=(_, _) => {
+  let callbacks = @pretty_prompt.PromptCallbacks::new(completion_items_provider=_ => {
     [CompletionItem::new("method")]
   })
+  let configuration = @pretty_prompt.PromptConfiguration::new(callbacks~)
   let console = FakeInputConsole::new([
     key('a', @console.A),
     key('.', @console.A),

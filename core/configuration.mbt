@@ -5,6 +5,262 @@ using @rendering {type AnsiColor}
 using @editing {type HistoryConfiguration, type CompletionItem}
 
 ///|
+pub struct CompletionSpan {
+  start : Int
+  length : Int
+}
+
+///|
+pub fn CompletionSpan::new(start : Int, length : Int) -> CompletionSpan {
+  {
+    start: if start < 0 {
+      0
+    } else {
+      start
+    },
+    length: if length < 0 {
+      0
+    } else {
+      length
+    },
+  }
+}
+
+///|
+pub fn CompletionSpan::end(self : CompletionSpan) -> Int {
+  self.start + self.length
+}
+
+///|
+pub fn CompletionSpan::contains_caret(
+  self : CompletionSpan,
+  caret : Int,
+) -> Bool {
+  caret >= self.start && caret <= self.end()
+}
+
+///|
+pub struct PromptSnapshot {
+  text : String
+  caret : Int
+}
+
+///|
+pub fn PromptSnapshot::new(text : String, caret : Int) -> PromptSnapshot {
+  let text_length = text.length()
+  let caret = if caret < 0 {
+    0
+  } else if caret > text_length {
+    text_length
+  } else {
+    caret
+  }
+  { text, caret }
+}
+
+///|
+pub struct KeyTransformContext {
+  snapshot : PromptSnapshot
+  key_press : KeyPress
+}
+
+///|
+pub fn KeyTransformContext::new(
+  snapshot : PromptSnapshot,
+  key_press : KeyPress,
+) -> KeyTransformContext {
+  { snapshot, key_press }
+}
+
+///|
+pub struct FormatInputContext {
+  snapshot : PromptSnapshot
+  key_press : KeyPress
+}
+
+///|
+pub fn FormatInputContext::new(
+  snapshot : PromptSnapshot,
+  key_press : KeyPress,
+) -> FormatInputContext {
+  { snapshot, key_press }
+}
+
+///|
+pub struct CompletionRequest {
+  snapshot : PromptSnapshot
+  span_to_replace : CompletionSpan
+}
+
+///|
+pub fn CompletionRequest::new(
+  snapshot : PromptSnapshot,
+  span_to_replace : CompletionSpan,
+) -> CompletionRequest {
+  { snapshot, span_to_replace }
+}
+
+///|
+pub struct CompletionTriggerContext {
+  snapshot : PromptSnapshot
+  key_press : KeyPress
+}
+
+///|
+pub fn CompletionTriggerContext::new(
+  snapshot : PromptSnapshot,
+  key_press : KeyPress,
+) -> CompletionTriggerContext {
+  { snapshot, key_press }
+}
+
+///|
+pub struct CompletionCommitContext {
+  snapshot : PromptSnapshot
+  key_press : KeyPress
+  selected_item : CompletionItem
+  span_to_replace : CompletionSpan
+}
+
+///|
+pub fn CompletionCommitContext::new(
+  snapshot : PromptSnapshot,
+  key_press : KeyPress,
+  selected_item : CompletionItem,
+  span_to_replace : CompletionSpan,
+) -> CompletionCommitContext {
+  { snapshot, key_press, selected_item, span_to_replace }
+}
+
+///|
+pub(all) enum KeyPressCallbackResult {
+  StayOnPrompt
+  SubmitPrompt(text~ : String)
+}
+
+///|
+pub struct KeyPressCallback {
+  pattern : KeyPressPattern
+  callback : async (PromptSnapshot) -> KeyPressCallbackResult
+}
+
+///|
+pub fn KeyPressCallback::new(
+  pattern : KeyPressPattern,
+  callback : async (PromptSnapshot) -> KeyPressCallbackResult,
+) -> KeyPressCallback {
+  { pattern, callback }
+}
+
+///|
+pub struct PromptCallbacks {
+  key_press_callbacks : Array[KeyPressCallback]
+  highlight_callback : async (PromptSnapshot) -> Array[FormatSpan]
+  completion_span_provider : async (PromptSnapshot) -> CompletionSpan
+  completion_items_provider : async (CompletionRequest) -> Array[CompletionItem]
+  should_open_completion_window : async (CompletionTriggerContext) -> Bool
+  transform_key_press : async (KeyTransformContext) -> KeyPress
+  confirm_completion_commit : async (CompletionCommitContext) -> Bool
+  format_input : async (FormatInputContext) -> (String, Int)
+  overload_provider : async (PromptSnapshot) -> (Array[OverloadItem], Int)
+}
+
+///|
+#warnings("-unused_async")
+async fn default_completion_span(snapshot : PromptSnapshot) -> CompletionSpan {
+  let text = snapshot.text
+  let caret = snapshot.caret
+
+  let mut start = caret
+  while start > 0 {
+    let ch = text.get_char(start - 1).unwrap()
+    if ch.is_ascii_alphabetic() || ch.is_ascii_digit() || ch == '_' {
+      start = start - 1
+    } else {
+      break
+    }
+  }
+
+  let mut end = caret
+  while end < text.length() {
+    let ch = text.get_char(end).unwrap()
+    if ch.is_ascii_alphabetic() || ch.is_ascii_digit() || ch == '_' {
+      end = end + 1
+    } else {
+      break
+    }
+  }
+
+  CompletionSpan::new(start, end - start)
+}
+
+///|
+#warnings("-unused_async")
+async fn default_should_open_completion_window(
+  ctx : CompletionTriggerContext,
+) -> Bool {
+  let text = ctx.snapshot.text
+  let caret = ctx.snapshot.caret
+  if caret > 0 {
+    let previous = text.get_char(caret - 1).unwrap()
+    if previous == '.' || previous == '(' {
+      return true
+    }
+  }
+
+  if caret == 1 {
+    let first = text.get_char(0).unwrap()
+    let second_is_word = text.length() > 1 &&
+      text.get_char(1).unwrap().is_ascii_alphabetic()
+    return !first.is_whitespace() && !second_is_word
+  }
+
+  caret - 2 >= 0 &&
+  text.get_char(caret - 2).unwrap().is_whitespace() &&
+  text.get_char(caret - 1).unwrap().is_ascii_alphabetic()
+}
+
+///|
+pub fn PromptCallbacks::new(
+  key_press_callbacks? : Array[KeyPressCallback] = [],
+  highlight_callback? : async (PromptSnapshot) -> Array[FormatSpan] = _ => [],
+  completion_span_provider? : async (PromptSnapshot) -> CompletionSpan = default_completion_span,
+  completion_items_provider? : async (CompletionRequest) -> Array[
+    CompletionItem,
+  ] = _ => [],
+  should_open_completion_window? : async (CompletionTriggerContext) -> Bool = default_should_open_completion_window,
+  transform_key_press? : async (KeyTransformContext) -> KeyPress = ctx => {
+    ctx.key_press
+  },
+  confirm_completion_commit? : async (CompletionCommitContext) -> Bool = _ => {
+    true
+  },
+  format_input? : async (FormatInputContext) -> (String, Int) = ctx => {
+    (ctx.snapshot.text, ctx.snapshot.caret)
+  },
+  overload_provider? : async (PromptSnapshot) -> (Array[OverloadItem], Int) = _ => {
+    ([], 0)
+  },
+) -> PromptCallbacks {
+  {
+    key_press_callbacks,
+    highlight_callback,
+    completion_span_provider,
+    completion_items_provider,
+    should_open_completion_window,
+    transform_key_press,
+    confirm_completion_commit,
+    format_input,
+    overload_provider,
+  }
+}
+
+///|
+pub impl Default for PromptCallbacks with default() {
+  PromptCallbacks::new()
+}
+
+///|
 struct KeyPressPattern {
   key : @console.ConsoleKey
   shift : Bool
@@ -329,9 +585,7 @@ pub struct PromptConfiguration {
   prompt : FormattedString
   key_bindings : KeyBindings
   history : HistoryConfiguration
-  highlighter : async (String) -> Array[FormatSpan]
-  completer : async (String, Int) -> Array[CompletionItem]
-  overload_provider : async (String, Int) -> Array[OverloadItem]
+  callbacks : PromptCallbacks
   selection_background : AnsiColor
   use_colors : Bool
   max_completion_items_count : Int
@@ -343,9 +597,7 @@ pub fn PromptConfiguration::new(
   prompt? : FormattedString = FormattedString::new("> "),
   key_bindings? : KeyBindings = KeyBindings::default(),
   history? : HistoryConfiguration = HistoryConfiguration::default(),
-  highlighter? : async (String) -> Array[FormatSpan] = _ => [],
-  completer? : async (String, Int) -> Array[CompletionItem] = (_, _) => [],
-  overload_provider? : async (String, Int) -> Array[OverloadItem] = (_, _) => [],
+  callbacks? : PromptCallbacks = PromptCallbacks::default(),
   selection_background? : AnsiColor = Blue,
   use_colors? : Bool = true,
   max_completion_items_count? : Int = 5,
@@ -355,9 +607,7 @@ pub fn PromptConfiguration::new(
     prompt,
     key_bindings,
     history,
-    highlighter,
-    completer,
-    overload_provider,
+    callbacks,
     selection_background,
     use_colors,
     max_completion_items_count,

@@ -37,7 +37,7 @@ fn CompletionPane::new() -> CompletionPane {
 }
 
 ///|
-fn CompletionPane::handle_navigation_modes(
+async fn CompletionPane::handle_navigation_modes(
   self : CompletionPane,
   runtime : Prompt,
   state : InputState,
@@ -54,8 +54,8 @@ async fn CompletionPane::handle_completion_and_history(
   runtime : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
   ignore(self)
-  runtime.handle_completion_and_history(state, key_bindings, info)
+  runtime.handle_completion_and_history(state, key_bindings, key_press)
 }

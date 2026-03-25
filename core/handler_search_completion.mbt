@@ -80,18 +80,26 @@ async fn Prompt::run_completion_and_history_handler(
   self : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
+  let info = key_press.console_key_info
   if key_bindings.trigger_completion.matches(info) {
-    let raw_line = line_from_buffers(state.left, state.right)
-    let items = (self.configuration.completer)(raw_line, state.left.length())
+    let snapshot = self.snapshot_of(state.left, state.right)
+    let span = (self.configuration.callbacks.completion_span_provider)(snapshot)
+    let normalized_span = self.normalize_completion_span(snapshot, span)
+    let items = (self.configuration.callbacks.completion_items_provider)(
+      CompletionRequest::new(snapshot, normalized_span),
+    )
     if items.length() > 0 {
-      let prefix_chars = state.left
-        .rev_iter()
-        .take_while(is_word_character)
-        .collect()
+      let prefix = if normalized_span.contains_caret(snapshot.caret) {
+        snapshot.text
+        .sub(start=normalized_span.start, end=snapshot.caret)
+        .to_string()
+      } else {
+        ""
+      }
       self.pane_state.completion_state = Some(
-        CompletionState::new(items, String::from_array(prefix_chars.rev())),
+        CompletionState::new(items, prefix),
       )
       state.request_render()
     }

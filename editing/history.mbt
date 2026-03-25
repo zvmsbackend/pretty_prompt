@@ -49,7 +49,14 @@ pub async fn HistoryLog::load_persistent_history(self : HistoryLog) -> Unit {
     return
   }
 
-  let contents = @fs.read_file(filepath).text() catch { _ => return }
+  let contents = @fs.read_file(filepath).text() catch {
+    e => {
+      if @async.is_being_cancelled() {
+        raise e
+      }
+      return
+    }
+  }
 
   self.entries.clear()
   for line in contents.split("\n") {

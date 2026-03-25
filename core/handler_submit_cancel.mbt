@@ -16,8 +16,9 @@ async fn Prompt::run_submit_or_cancel_handler(
   self : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
+  let info = key_press.console_key_info
   self.history.reset_navigation()
 
   if key_bindings.cancel_prompt.matches(info) || is_control_c_key(info) {

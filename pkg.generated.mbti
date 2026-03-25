@@ -38,13 +38,23 @@ pub using @rendering {type Cell}
 
 pub using @ports {type ClipboardPortError}
 
+pub using @core {type CompletionCommitContext}
+
 pub using @editing {type CompletionItem}
 
+pub using @core {type CompletionRequest}
+
+pub using @core {type CompletionSpan}
+
 pub using @editing {type CompletionState}
+
+pub using @core {type CompletionTriggerContext}
 
 pub using @rendering {type ConsoleFormat}
 
 pub using @ports {type ControlCMode}
+
+pub using @core {type FormatInputContext}
 
 pub using @rendering {type FormatSpan}
 
@@ -58,9 +68,15 @@ pub using @core {type KeyBindings}
 
 pub using @core {type KeyPress}
 
+pub using @core {type KeyPressCallback}
+
+pub using @core {type KeyPressCallbackResult}
+
 pub using @core {type KeyPressPattern}
 
 pub using @core {type KeyPressPatterns}
+
+pub using @core {type KeyTransformContext}
 
 pub using @editing {type KillRing}
 
@@ -74,9 +90,13 @@ pub using @ports {type Ports}
 
 pub using @core {type Prompt}
 
+pub using @core {type PromptCallbacks}
+
 pub using @core {type PromptConfiguration}
 
 pub using @core {type PromptResult}
+
+pub using @core {type PromptSnapshot}
 
 pub using @rendering {type Screen}
 

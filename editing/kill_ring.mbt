@@ -31,11 +31,12 @@ pub fn KillRing::add(self : KillRing, text : String) -> Unit {
 ///|
 /// 获取最近的文本
 pub fn KillRing::yank(self : KillRing) -> String? {
-  if self.items.length() == 0 {
-    None
-  } else {
-    self.current_index = 0
-    Some(self.items[0])
+  match self.items {
+    [] => None
+    [head, ..] => {
+      self.current_index = 0
+      Some(head)
+    }
   }
 }
 

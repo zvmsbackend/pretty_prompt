@@ -14,6 +14,40 @@ pub fn read_key_presses(&@ports.ConsolePort) -> Array[KeyPress]
 // Errors
 
 // Types and methods
+pub struct CompletionCommitContext {
+  snapshot : PromptSnapshot
+  key_press : KeyPress
+  selected_item : @editing.CompletionItem
+  span_to_replace : CompletionSpan
+}
+pub fn CompletionCommitContext::new(PromptSnapshot, KeyPress, @editing.CompletionItem, CompletionSpan) -> Self
+
+pub struct CompletionRequest {
+  snapshot : PromptSnapshot
+  span_to_replace : CompletionSpan
+}
+pub fn CompletionRequest::new(PromptSnapshot, CompletionSpan) -> Self
+
+pub struct CompletionSpan {
+  start : Int
+  length : Int
+}
+pub fn CompletionSpan::contains_caret(Self, Int) -> Bool
+pub fn CompletionSpan::end(Self) -> Int
+pub fn CompletionSpan::new(Int, Int) -> Self
+
+pub struct CompletionTriggerContext {
+  snapshot : PromptSnapshot
+  key_press : KeyPress
+}
+pub fn CompletionTriggerContext::new(PromptSnapshot, KeyPress) -> Self
+
+pub struct FormatInputContext {
+  snapshot : PromptSnapshot
+  key_press : KeyPress
+}
+pub fn FormatInputContext::new(PromptSnapshot, KeyPress) -> Self
+
 pub struct KeyBindings {
   submit_prompt : KeyPressPatterns
   cancel_prompt : KeyPressPatterns
@@ -54,6 +88,17 @@ pub struct KeyPress {
 pub fn KeyPress::from_console_key_info(@console.ConsoleKeyInfo) -> Self
 pub fn KeyPress::from_pasted_text(String) -> Self
 
+pub struct KeyPressCallback {
+  pattern : KeyPressPattern
+  callback : async (PromptSnapshot) -> KeyPressCallbackResult
+}
+pub fn KeyPressCallback::new(KeyPressPattern, async (PromptSnapshot) -> KeyPressCallbackResult) -> Self
+
+pub(all) enum KeyPressCallbackResult {
+  StayOnPrompt
+  SubmitPrompt(text~ : String)
+}
+
 type KeyPressPattern
 pub fn KeyPressPattern::matches(Self, @console.ConsoleKeyInfo) -> Bool
 pub fn KeyPressPattern::new(@console.ConsoleKey, shift? : Bool, alt? : Bool, control? : Bool) -> Self
@@ -65,6 +110,12 @@ pub fn KeyPressPatterns::matches(Self, @console.ConsoleKeyInfo) -> Bool
 pub fn KeyPressPatterns::new(Array[KeyPressPattern]) -> Self
 pub fn KeyPressPatterns::single(KeyPressPattern) -> Self
 
+pub struct KeyTransformContext {
+  snapshot : PromptSnapshot
+  key_press : KeyPress
+}
+pub fn KeyTransformContext::new(PromptSnapshot, KeyPress) -> Self
+
 type Prompt
 pub async fn Prompt::dispose(Self) -> Unit
 pub async fn Prompt::new(&@ports.ConsolePort, &@ports.ClipboardPort, configuration? : PromptConfiguration) -> Self
@@ -72,19 +123,31 @@ pub async fn Prompt::read_line(Self) -> PromptResult
 pub async fn Prompt::read_line_with_prompt(Self, @rendering.FormattedString) -> PromptResult
 pub fn Prompt::take_execution_cancellation_requested(Self) -> Bool
 
+pub struct PromptCallbacks {
+  key_press_callbacks : Array[KeyPressCallback]
+  highlight_callback : async (PromptSnapshot) -> Array[@rendering.FormatSpan]
+  completion_span_provider : async (PromptSnapshot) -> CompletionSpan
+  completion_items_provider : async (CompletionRequest) -> Array[@editing.CompletionItem]
+  should_open_completion_window : async (CompletionTriggerContext) -> Bool
+  transform_key_press : async (KeyTransformContext) -> KeyPress
+  confirm_completion_commit : async (CompletionCommitContext) -> Bool
+  format_input : async (FormatInputContext) -> (String, Int)
+  overload_provider : async (PromptSnapshot) -> (Array[@editing.OverloadItem], Int)
+}
+pub fn PromptCallbacks::new(key_press_callbacks? : Array[KeyPressCallback], highlight_callback? : async (PromptSnapshot) -> Array[@rendering.FormatSpan], completion_span_provider? : async (PromptSnapshot) -> CompletionSpan, completion_items_provider? : async (CompletionRequest) -> Array[@editing.CompletionItem], should_open_completion_window? : async (CompletionTriggerContext) -> Bool, transform_key_press? : async (KeyTransformContext) -> KeyPress, confirm_completion_commit? : async (CompletionCommitContext) -> Bool, format_input? : async (FormatInputContext) -> (String, Int), overload_provider? : async (PromptSnapshot) -> (Array[@editing.OverloadItem], Int)) -> Self
+pub impl Default for PromptCallbacks
+
 pub struct PromptConfiguration {
   prompt : @rendering.FormattedString
   key_bindings : KeyBindings
   history : @editing.HistoryConfiguration
-  highlighter : async (String) -> Array[@rendering.FormatSpan]
-  completer : async (String, Int) -> Array[@editing.CompletionItem]
-  overload_provider : async (String, Int) -> Array[@editing.OverloadItem]
+  callbacks : PromptCallbacks
   selection_background : @rendering.AnsiColor
   use_colors : Bool
   max_completion_items_count : Int
   kill_ring_max_size : Int
 }
-pub fn PromptConfiguration::new(prompt? : @rendering.FormattedString, key_bindings? : KeyBindings, history? : @editing.HistoryConfiguration, highlighter? : async (String) -> Array[@rendering.FormatSpan], completer? : async (String, Int) -> Array[@editing.CompletionItem], overload_provider? : async (String, Int) -> Array[@editing.OverloadItem], selection_background? : @rendering.AnsiColor, use_colors? : Bool, max_completion_items_count? : Int, kill_ring_max_size? : Int) -> Self
+pub fn PromptConfiguration::new(prompt? : @rendering.FormattedString, key_bindings? : KeyBindings, history? : @editing.HistoryConfiguration, callbacks? : PromptCallbacks, selection_background? : @rendering.AnsiColor, use_colors? : Bool, max_completion_items_count? : Int, kill_ring_max_size? : Int) -> Self
 pub impl Default for PromptConfiguration
 
 pub struct PromptResult {
@@ -94,6 +157,12 @@ pub struct PromptResult {
 }
 pub fn PromptResult::cancelled(@console.ConsoleKeyInfo) -> Self
 pub fn PromptResult::submitted(String, @console.ConsoleKeyInfo) -> Self
+
+pub struct PromptSnapshot {
+  text : String
+  caret : Int
+}
+pub fn PromptSnapshot::new(String, Int) -> Self
 
 // Type aliases
 

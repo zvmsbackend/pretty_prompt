@@ -1,5 +1,5 @@
 ///|
-fn Prompt::run_navigation_modes_handler(
+async fn Prompt::run_navigation_modes_handler(
   self : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
@@ -15,34 +15,28 @@ fn Prompt::run_navigation_modes_handler(
       return Handled
     }
     if key_bindings.history_previous.matches(info) {
-      match self.pane_state.completion_state {
-        Some(s) =>
-          s.set_selected_index(
-            cycle_previous_index(s.selected_index, s.items.length()),
-          )
-        None =>
-          if self.pane_state.overload_state is Some(s) {
-            s.set_selected_index(
-              cycle_previous_index(s.selected_index, s.items.length()),
-            )
-          }
+      if self.pane_state.completion_state is Some(s) {
+        s.set_selected_index(
+          cycle_previous_index(s.selected_index, s.items.length()),
+        )
+      } else if self.pane_state.overload_state is Some(s) {
+        s.set_selected_index(
+          cycle_previous_index(s.selected_index, s.items.length()),
+        )
       }
       state.request_render()
       state.last_was_yank = false
       return Handled
     }
     if key_bindings.history_next.matches(info) {
-      match self.pane_state.completion_state {
-        Some(s) =>
-          s.set_selected_index(
-            cycle_next_index(s.selected_index, s.items.length()),
-          )
-        None =>
-          if self.pane_state.overload_state is Some(s) {
-            s.set_selected_index(
-              cycle_next_index(s.selected_index, s.items.length()),
-            )
-          }
+      if self.pane_state.completion_state is Some(s) {
+        s.set_selected_index(
+          cycle_next_index(s.selected_index, s.items.length()),
+        )
+      } else if self.pane_state.overload_state is Some(s) {
+        s.set_selected_index(
+          cycle_next_index(s.selected_index, s.items.length()),
+        )
       }
       state.request_render()
       state.last_was_yank = false
@@ -53,16 +47,20 @@ fn Prompt::run_navigation_modes_handler(
         key_bindings.trigger_completion.matches(info) {
         if s.items.length() > 0 {
           let item = s.items[s.selected_index]
-          while state.left.length() > 0 &&
-                is_word_character(state.left[state.left.length() - 1]) {
-            ignore(state.left.pop())
+          let snapshot = self.snapshot_of(state.left, state.right)
+          let key_press = KeyPress::from_console_key_info(info)
+          let span = self.normalize_completion_span(
+            snapshot,
+            (self.configuration.callbacks.completion_span_provider)(snapshot),
+          )
+          let should_commit = (self.configuration.callbacks.confirm_completion_commit)(
+            CompletionCommitContext::new(snapshot, key_press, item, span),
+          )
+          if should_commit {
+            self
+            ..replace_completion_span(state, span, item.replacement_text)
+            .track_undo(state.left, state.right)
           }
-          while state.right.length() > 0 &&
-                is_word_character(state.right[state.right.length() - 1]) {
-            ignore(state.right.pop())
-          }
-          state.left.push_iter(item.replacement_text.iter())
-          self.track_undo(state.left, state.right)
         }
         self.pane_state.completion_state = None
         state.request_render()
@@ -259,30 +257,70 @@ fn Prompt::run_edit_keys_handler(
 async fn Prompt::run_character_input_handler(
   self : Prompt,
   state : InputState,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
+  let info = key_press.console_key_info
   let ch = info.key_char
   if !ch.is_control() {
     self.delete_selection(state.left, state.right)
     state.left.push(ch)
+    self.apply_format_input(state, key_press)
+
+    let snapshot = self.snapshot_of(state.left, state.right)
     if self.pane_state.completion_state is Some(completion_state) {
-      update_completion_filter(completion_state, state.left)
-    } else if ch == '.' {
-      let raw_line = line_from_buffers(state.left, state.right)
-      let items = (self.configuration.completer)(raw_line, state.left.length())
-      if items.length() > 0 {
-        self.pane_state.completion_state = Some(CompletionState::new(items, ""))
-      }
-    } else if ch == '(' {
-      let raw_line = line_from_buffers(state.left, state.right)
-      let overloads = (self.configuration.overload_provider)(
-        raw_line,
-        state.left.length(),
+      let span = self.normalize_completion_span(
+        snapshot,
+        (self.configuration.callbacks.completion_span_provider)(snapshot),
       )
-      if overloads.length() > 0 {
-        self.pane_state.overload_state = Some(OverloadState::new(overloads))
+      let prefix = if span.contains_caret(snapshot.caret) {
+        snapshot.text.sub(start=span.start, end=snapshot.caret).to_string()
+      } else {
+        ""
+      }
+      completion_state.filter(prefix)
+    } else {
+      let should_open = (self.configuration.callbacks.should_open_completion_window)(
+        CompletionTriggerContext::new(snapshot, key_press),
+      )
+      if should_open {
+        let span = self.normalize_completion_span(
+          snapshot,
+          (self.configuration.callbacks.completion_span_provider)(snapshot),
+        )
+        let items = (self.configuration.callbacks.completion_items_provider)(
+          CompletionRequest::new(snapshot, span),
+        )
+        if items.length() > 0 {
+          let prefix = if span.contains_caret(snapshot.caret) {
+            snapshot.text.sub(start=span.start, end=snapshot.caret).to_string()
+          } else {
+            ""
+          }
+          self.pane_state.completion_state = Some(
+            CompletionState::new(items, prefix),
+          )
+        }
       }
     }
+
+    let (overloads, selected_index) = (self.configuration.callbacks.overload_provider)(
+      snapshot,
+    )
+    if overloads.length() > 0 {
+      let overload_state = OverloadState::new(overloads)
+      let normalized_index = if selected_index < 0 {
+        0
+      } else if selected_index >= overload_state.items.length() {
+        overload_state.items.length() - 1
+      } else {
+        selected_index
+      }
+      overload_state.set_selected_index(normalized_index)
+      self.pane_state.overload_state = Some(overload_state)
+    } else {
+      self.pane_state.overload_state = None
+    }
+
     self.track_undo(state.left, state.right)
     state.request_render()
     state.last_was_yank = false

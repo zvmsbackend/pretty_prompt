@@ -176,9 +176,7 @@ async test "history track_submission ignores empty and duplicate" {
 ///|
 async test "history saves and loads with max_entries trim" {
   let path = "_build/editing_history_wbtest.log"
-  @fs.remove(path) catch {
-    _ => ()
-  }
+  ignore(try? Some(@fs.remove(path)))
 
   let config = HistoryConfiguration::new(
     persistent_history_filepath=path,
@@ -195,7 +193,5 @@ async test "history saves and loads with max_entries trim" {
   assert_eq(reader.entry_count(), 2)
   assert_eq(reader.navigate_previous(""), Some("three"))
 
-  @fs.remove(path) catch {
-    _ => ()
-  }
+  ignore(try? Some(@fs.remove(path)))
 }

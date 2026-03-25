@@ -129,17 +129,24 @@ async fn Prompt::process_key_press(
   key_bindings : KeyBindings,
   key_press : KeyPress,
 ) -> KeyProcessingResult {
-  let info = key_press.console_key_info
+  let transformed = (self.configuration.callbacks.transform_key_press)(
+    KeyTransformContext::new(
+      self.snapshot_of(state.left, state.right),
+      key_press,
+    ),
+  )
+  let info = transformed.console_key_info
   if key_bindings.cancel_prompt.matches(info) || is_control_c_key(info) {
     return Return(self.cancel_prompt(info))
   }
 
-  if key_press.pasted_text is Some(pasted) {
+  if transformed.pasted_text is Some(pasted) {
     self.pane_state.completion_state = None
     self.pane_state.overload_state = None
     self.pane_state.search_state = None
     self.delete_selection(state.left, state.right)
     state.left.push_iter(pasted.iter())
+    self.apply_format_input(state, transformed)
     self.track_undo(state.left, state.right)
     state.request_render()
     state.last_was_yank = false
@@ -150,7 +157,7 @@ async fn Prompt::process_key_press(
     prompt,
     state,
     key_bindings,
-    info,
+    transformed,
     default_pane_pipeline(),
   )
 }
@@ -164,6 +171,83 @@ fn Prompt::cancel_prompt(
 }
 
 ///|
+fn Prompt::snapshot_of(
+  self : Prompt,
+  left : Array[Char],
+  right : Array[Char],
+) -> PromptSnapshot {
+  ignore(self)
+  PromptSnapshot::new(line_from_buffers(left, right), left.length())
+}
+
+///|
+fn Prompt::apply_snapshot(
+  self : Prompt,
+  state : InputState,
+  snapshot : PromptSnapshot,
+) -> Unit {
+  self.set_line_buffers(state.left, state.right, snapshot.text)
+  while state.left.length() > snapshot.caret {
+    if state.left.pop() is Some(ch) {
+      state.right.push(ch)
+    }
+  }
+}
+
+///|
+fn Prompt::normalize_completion_span(
+  self : Prompt,
+  snapshot : PromptSnapshot,
+  span : CompletionSpan,
+) -> CompletionSpan {
+  ignore(self)
+  let start = if span.start < 0 {
+    0
+  } else if span.start > snapshot.text.length() {
+    snapshot.text.length()
+  } else {
+    span.start
+  }
+  let end = if span.end() < start {
+    start
+  } else if span.end() > snapshot.text.length() {
+    snapshot.text.length()
+  } else {
+    span.end()
+  }
+  CompletionSpan::new(start, end - start)
+}
+
+///|
+async fn Prompt::apply_format_input(
+  self : Prompt,
+  state : InputState,
+  key_press : KeyPress,
+) -> Unit {
+  let snapshot = self.snapshot_of(state.left, state.right)
+  let (text, caret) = (self.configuration.callbacks.format_input)(
+    FormatInputContext::new(snapshot, key_press),
+  )
+  self.apply_snapshot(state, PromptSnapshot::new(text, caret))
+}
+
+///|
+fn Prompt::replace_completion_span(
+  self : Prompt,
+  state : InputState,
+  span : CompletionSpan,
+  replacement_text : String,
+) -> Unit {
+  let snapshot = self.snapshot_of(state.left, state.right)
+  let normalized = self.normalize_completion_span(snapshot, span)
+  let prefix = snapshot.text.sub(end=normalized.start).to_string()
+  let suffix = snapshot.text.sub(start=normalized.end()).to_string()
+  let next = "\{prefix}\{replacement_text}\{suffix}"
+  let next_caret = prefix.length() + replacement_text.length()
+  self.apply_snapshot(state, PromptSnapshot::new(next, next_caret))
+}
+
+///|
 fn Prompt::handle_search_mode(
   self : Prompt,
   state : InputState,
@@ -174,7 +258,7 @@ fn Prompt::handle_search_mode(
 }
 
 ///|
-fn Prompt::handle_navigation_modes(
+async fn Prompt::handle_navigation_modes(
   self : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
@@ -238,9 +322,9 @@ async fn Prompt::handle_completion_and_history(
   self : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
-  self.run_completion_and_history_handler(state, key_bindings, info)
+  self.run_completion_and_history_handler(state, key_bindings, key_press)
 }
 
 ///|
@@ -248,9 +332,9 @@ async fn Prompt::handle_submit_or_cancel(
   self : Prompt,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
-  self.run_submit_or_cancel_handler(state, key_bindings, info)
+  self.run_submit_or_cancel_handler(state, key_bindings, key_press)
 }
 
 ///|
@@ -267,9 +351,9 @@ fn Prompt::handle_edit_keys(
 async fn Prompt::handle_character_input(
   self : Prompt,
   state : InputState,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> KeyProcessingResult {
-  self.run_character_input_handler(state, info)
+  self.run_character_input_handler(state, key_press)
 }
 
 ///|
@@ -571,7 +655,9 @@ async fn Prompt::render_line(
 
   // 4. Draw Input Lines
   let spans = if self.configuration.use_colors {
-    (self.configuration.highlighter)(raw_line)
+    (self.configuration.callbacks.highlight_callback)(
+      PromptSnapshot::new(raw_line, left.length()),
+    )
   } else {
     []
   }

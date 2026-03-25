@@ -57,7 +57,7 @@ priv struct PaneContext {
   prompt : FormattedString
   state : InputState
   key_bindings : KeyBindings
-  info : @console.ConsoleKeyInfo
+  key_press : KeyPress
 }
 
 ///|
@@ -66,9 +66,9 @@ fn PaneContext::new(
   prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
 ) -> PaneContext {
-  { runtime, prompt, state, key_bindings, info }
+  { runtime, prompt, state, key_bindings, key_press }
 }
 
 ///|
@@ -91,7 +91,8 @@ impl Pane for PaneEntry with on_key(self, context, phase) {
   let prompt = context.prompt
   let state = context.state
   let key_bindings = context.key_bindings
-  let info = context.info
+  let key_press = context.key_press
+  let info = key_press.console_key_info
   match phase {
     KeyDown =>
       match self {
@@ -115,12 +116,13 @@ impl Pane for PaneEntry with on_key(self, context, phase) {
         UndoRedoHandler => runtime.handle_undo_redo(state, key_bindings, info)
         CompletionAndHistoryHandler =>
           CompletionPane::new().handle_completion_and_history(
-            runtime, state, key_bindings, info,
+            runtime, state, key_bindings, key_press,
           )
         SubmitOrCancelHandler =>
-          runtime.handle_submit_or_cancel(state, key_bindings, info)
+          runtime.handle_submit_or_cancel(state, key_bindings, key_press)
         EditKeysHandler => runtime.handle_edit_keys(state, key_bindings, info)
-        CharacterInputHandler => runtime.handle_character_input(state, info)
+        CharacterInputHandler =>
+          runtime.handle_character_input(state, key_press)
       }
     KeyUp => runtime.commit_requested_render(prompt, state)
   }
@@ -164,14 +166,14 @@ async fn Prompt::run_pane_pipeline(
   prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
   pipeline : PanePipeline,
 ) -> KeyProcessingResult {
   let down = self.run_pane_phase(
     prompt,
     state,
     key_bindings,
-    info,
+    key_press,
     pipeline,
     KeyDown,
   )
@@ -183,7 +185,7 @@ async fn Prompt::run_pane_pipeline(
     prompt,
     state,
     key_bindings,
-    info,
+    key_press,
     pipeline,
     KeyUp,
   )
@@ -218,7 +220,7 @@ async fn Prompt::run_pane_phase(
   prompt : FormattedString,
   state : InputState,
   key_bindings : KeyBindings,
-  info : @console.ConsoleKeyInfo,
+  key_press : KeyPress,
   pipeline : PanePipeline,
   phase : KeyPhase,
 ) -> KeyProcessingResult {
@@ -226,7 +228,7 @@ async fn Prompt::run_pane_phase(
     if !pane.supports_phase(phase) {
       continue
     }
-    let context = PaneContext::new(self, prompt, state, key_bindings, info)
+    let context = PaneContext::new(self, prompt, state, key_bindings, key_press)
     let result = pane.on_key(context, phase)
     if !(result is NotHandled) {
       return result
