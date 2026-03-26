@@ -8,9 +8,9 @@
     "moonbitlang/async": "0.16.8"
   },
   "readme": "README.mbt.md",
-  "repository": "",
+  "repository": "https://github.com/zvmsbackend/pretty_prompt",
   "license": "Apache-2.0",
-  "keywords": [],
-  "description": "",
+  "keywords": ["prompt", "cli", "tool", "console", "terminal"],
+  "description": "A pretty prompt library for Moonbit, providing an easy way to create interactive command-line interfaces with customizable prompts and input handling.",
   "preferred-target": "native"
 }
