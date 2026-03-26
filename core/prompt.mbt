@@ -9,8 +9,7 @@ using @rendering {
   type Screen,
   type Cell,
   wrap_text,
-  get_chars_width,
-  get_char_width,
+  get_string_width,
   render_diff,
 }
 
@@ -673,7 +672,7 @@ async fn Prompt::render_line(
   let full_text = active_prompt.text + raw_line
   let wrapped = wrap_text(
     full_text,
-    active_prompt_width + get_chars_width(left.iter()),
+    active_prompt_width + get_string_width(String::from_array(left)),
     width,
   )
 
@@ -782,7 +781,7 @@ async fn Prompt::render_line(
       }
 
       new_screen.rows[r][line_col] = Cell::new(ch, format)
-      let w = get_char_width(ch)
+      let w = get_string_width(ch.to_string())
       if w == 2 && line_col + 1 < width {
         new_screen.rows[r][line_col + 1] = Cell::new('\u{0000}', format)
       }

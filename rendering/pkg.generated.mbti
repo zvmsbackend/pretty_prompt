@@ -8,10 +8,6 @@ import {
 // Values
 pub fn apply_highlights(String, Array[FormatSpan]) -> String
 
-pub fn get_char_width(Char) -> Int
-
-pub fn get_chars_width(Iter[Char]) -> Int
-
 pub fn get_string_width(String) -> Int
 
 pub fn is_word_boundary(Char?, Char?) -> Bool

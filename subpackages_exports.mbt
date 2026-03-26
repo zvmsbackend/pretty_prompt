@@ -18,8 +18,6 @@ pub using @rendering {
   type Screen,
   type WrappedText,
   apply_highlights,
-  get_char_width,
-  get_chars_width,
   get_string_width,
   is_word_boundary,
   wrap_text,
@@ -45,7 +43,6 @@ pub using @editing {
 pub using @core {
   type KeyPressPattern,
   type KeyPress,
-  read_key_presses,
   type KeyPressPatterns,
   type CompletionSpan,
   type PromptSnapshot,

@@ -152,11 +152,6 @@ pub async fn HistoryLog::track_submission(
 }
 
 ///|
-pub fn HistoryLog::entry_count(self : HistoryLog) -> Int {
-  self.entries.length()
-}
-
-///|
 /// 在历史记录中搜索匹配项
 pub fn HistoryLog::navigate_search(
   self : HistoryLog,

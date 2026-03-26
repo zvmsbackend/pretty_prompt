@@ -352,68 +352,6 @@ pub impl ConsolePort for FakeInputConsole with remove_cancel_key_press_handler(
 }
 
 ///|
-test "read_key_presses normalizes enter char" {
-  let console = FakeInputConsole::new([key('\r', @console.Enter)])
-  let key_presses = @pretty_prompt.read_key_presses(console)
-  assert_eq(key_presses.length(), 1)
-  assert_eq(key_presses[0].console_key_info.key_char, '\n')
-  assert_eq(key_presses[0].console_key_info.key, @console.Enter)
-  assert_eq(key_presses[0].pasted_text, None)
-}
-
-///|
-test "read_key_presses returns burst as paste" {
-  let console = FakeInputConsole::new_with_batch(
-    [
-      key('a', @console.A),
-      key('b', @console.B),
-      key('c', @console.C),
-      key('d', @console.D),
-    ],
-    true,
-  )
-  let key_presses = @pretty_prompt.read_key_presses(console)
-  assert_eq(key_presses.length(), 1)
-  assert_eq(key_presses[0].console_key_info.key, @console.Insert)
-  assert_eq(key_presses[0].console_key_info.shift, true)
-  assert_eq(key_presses[0].pasted_text, Some("abcd"))
-}
-
-///|
-test "read_key_presses keeps control burst as key presses" {
-  let console = FakeInputConsole::new_with_batch(
-    [
-      key('\u0001', @console.A, control=true),
-      key('\u0002', @console.B, control=true),
-      key('\u0003', @console.C, control=true),
-      key('\u0004', @console.D, control=true),
-    ],
-    true,
-  )
-  let key_presses = @pretty_prompt.read_key_presses(console)
-  assert_eq(key_presses.length(), 4)
-  assert_eq(key_presses[0].pasted_text, None)
-  assert_eq(key_presses[3].console_key_info.key_char, '\u0004')
-}
-
-///|
-test "read_key_presses ESC prefix is not treated as paste" {
-  let console = FakeInputConsole::new_with_batch(
-    [
-      key('\u001b', @console.Escape),
-      key('a', @console.A),
-      key('b', @console.B),
-      key('c', @console.C),
-    ],
-    true,
-  )
-  let key_presses = @pretty_prompt.read_key_presses(console)
-  assert_eq(key_presses.length(), 1)
-  assert_eq(key_presses[0].pasted_text, None)
-  assert_eq(key_presses[0].console_key_info.key_char, '\u001b')
-}
-
-///|
 test "key press patterns empty and has_any" {
   let empty = @pretty_prompt.KeyPressPatterns::empty()
   assert_false(empty.has_any())

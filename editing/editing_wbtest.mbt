@@ -137,7 +137,7 @@ async test "history previous/next and entry_count work" {
 
   log.track_submission("alpha")
   log.track_submission("beta")
-  assert_eq(log.entry_count(), 2)
+  assert_eq(log.entries.length(), 2)
 
   assert_eq(log.navigate_previous(""), Some("beta"))
   assert_eq(log.navigate_previous(""), Some("alpha"))
@@ -170,7 +170,7 @@ async test "history track_submission ignores empty and duplicate" {
   log.track_submission("")
   log.track_submission("dup")
   log.track_submission("dup")
-  assert_eq(log.entry_count(), 1)
+  assert_eq(log.entries.length(), 1)
 }
 
 ///|
@@ -190,7 +190,7 @@ async test "history saves and loads with max_entries trim" {
 
   let reader = HistoryLog::new(config)
   reader.load_persistent_history()
-  assert_eq(reader.entry_count(), 2)
+  assert_eq(reader.entries.length(), 2)
   assert_eq(reader.navigate_previous(""), Some("three"))
 
   ignore(try? Some(@fs.remove(path)))

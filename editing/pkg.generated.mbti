@@ -39,7 +39,6 @@ pub struct HistoryLog {
   mut unsubmitted_buffer : String
   mut submissions_since_last_trim : Int
 }
-pub fn HistoryLog::entry_count(Self) -> Int
 pub async fn HistoryLog::load_persistent_history(Self) -> Unit
 pub fn HistoryLog::navigate_next(Self) -> String?
 pub fn HistoryLog::navigate_previous(Self, String) -> String?

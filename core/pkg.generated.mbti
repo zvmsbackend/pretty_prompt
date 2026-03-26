@@ -9,7 +9,6 @@ import {
 }
 
 // Values
-pub fn read_key_presses(&@ports.ConsolePort) -> Array[KeyPress]
 
 // Errors
 

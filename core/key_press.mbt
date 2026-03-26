@@ -28,7 +28,7 @@ pub fn KeyPress::from_pasted_text(pasted_text : String) -> KeyPress {
 }
 
 ///|
-pub fn read_key_presses(console : &ConsolePort) -> Array[KeyPress] {
+fn read_key_presses(console : &ConsolePort) -> Array[KeyPress] {
   let first = console.read_key(true)
   if !console.key_available() {
     return [KeyPress::from_console_key_info(first)]

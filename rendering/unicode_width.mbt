@@ -176,7 +176,7 @@ let combining : Array[Interval] = [
 ]
 
 ///|
-pub fn get_char_width(ch : Char) -> Int {
+fn get_char_width(ch : Char) -> Int {
   let ucs = ch.to_int()
   if ucs == 0 {
     return 0
@@ -222,7 +222,7 @@ pub fn get_char_width(ch : Char) -> Int {
 }
 
 ///|
-pub fn get_chars_width(chars : Iter[Char]) -> Int {
+fn get_chars_width(chars : Iter[Char]) -> Int {
   for ch in chars; width = 0 {
     continue width + get_char_width(ch)
   } nobreak {
