@@ -740,16 +740,15 @@ async fn Prompt::render_line(
   active_prompt_spans.sort_by_key(span => span.start)
 
   for r in 0..<wrapped.lines.length() {
-    let line_text = wrapped.lines[r]
+    let line = wrapped.lines[r]
     let mut line_col = 0
     let mut char_index_on_line = 0
 
-    for ch in line_text {
+    for ch in line.text {
       let mut format = ConsoleFormat::default()
       if self.configuration.use_colors {
         let is_prompt_area = r == 0 && line_col < active_prompt_width
         if is_prompt_area {
-          // Apply prompt styles
           for span in active_prompt_spans {
             if char_index_on_line >= span.start &&
               char_index_on_line < span.start + span.length {
@@ -758,11 +757,10 @@ async fn Prompt::render_line(
             }
           }
         } else {
-          // Apply input text styles
           let i = if r == 0 {
             char_index_on_line - active_prompt_width
           } else {
-            char_index_on_line
+            line.start_index - active_prompt_width - 1 + char_index_on_line
           }
           for span in spans {
             if i >= span.start && i < span.start + span.length {

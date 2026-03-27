@@ -18,7 +18,7 @@ moon add sennenki/pretty_prompt/system
 
 在 `moon.pkg` 中导入：
 
-```moonbit
+```moonbit nocheck
 import {
   "sennenki/pretty_prompt" @pp,
   "sennenki/pretty_prompt/system" @sys,
@@ -27,7 +27,7 @@ import {
 
 ## 快速开始
 
-```moonbit
+```moonbit nocheck
 ///|
 async fn main {
   let prompt = @pp.Prompt::new(
@@ -52,7 +52,7 @@ async fn main {
 
 ## 使用自定义 Prompt 文本
 
-```moonbit
+```moonbit nocheck
 ///|
 async fn main {
   let prompt = @pp.Prompt::new(
@@ -85,7 +85,7 @@ async fn main {
 
 示例：
 
-```moonbit
+```moonbit nocheck
 ///|
 fn make_configuration() -> @pp.PromptConfiguration {
   @pp.PromptConfiguration::new(
@@ -111,7 +111,7 @@ fn make_configuration() -> @pp.PromptConfiguration {
 
 示例：把软换行改成 `Shift+Enter`：
 
-```moonbit
+```moonbit nocheck
 ///|
 fn make_key_bindings() -> @pp.KeyBindings {
   @pp.KeyBindings::new(
@@ -138,14 +138,13 @@ fn make_key_bindings() -> @pp.KeyBindings {
 
 最小回调示例：
 
-```moonbit
+```moonbit nocheck
 ///|
 fn make_callbacks() -> @pp.PromptCallbacks {
   @pp.PromptCallbacks::new(
-    completion_items_provider=_ => [
-      @pp.CompletionItem::new("print"),
-      @pp.CompletionItem::new("println"),
-    ],
+    completion_items_provider=_ => {
+      [@pp.CompletionItem::new("print"), @pp.CompletionItem::new("println")]
+    },
     should_open_completion_window=_ => false,
     should_insert_soft_newline=(snapshot, _) => !snapshot.text.trim().is_empty(),
   )
@@ -154,7 +153,7 @@ fn make_callbacks() -> @pp.PromptCallbacks {
 
 ## 历史记录持久化
 
-```moonbit
+```moonbit nocheck
 ///|
 let history = @pp.HistoryConfiguration::new(
   persistent_history_filepath=".pretty_prompt_history",

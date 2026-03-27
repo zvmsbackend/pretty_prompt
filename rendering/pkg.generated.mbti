@@ -85,8 +85,13 @@ pub fn Screen::draw_string(Self, Int, Int, String, ConsoleFormat) -> Unit
 pub fn Screen::new(Int, Int) -> Self
 pub fn Screen::set_cursor(Self, Int, Int) -> Unit
 
+pub struct WrappedLine {
+  text : String
+  start_index : Int
+}
+
 pub struct WrappedText {
-  lines : Array[String]
+  lines : Array[WrappedLine]
   cursor_row : Int
   cursor_col : Int
 }

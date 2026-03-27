@@ -204,14 +204,17 @@ test "word boundary checks whitespace and type transitions" {
 ///|
 test "wrap_text handles zero width and explicit newline" {
   let zero = wrap_text("abc", 2, 0)
-  assert_eq(zero.lines, ["abc"])
+  assert_eq(zero.lines[0].text, "abc")
+  assert_eq(zero.lines[0].start_index, 0)
   assert_eq(zero.cursor_row, 0)
   assert_eq(zero.cursor_col, 2)
 
   let wrapped = wrap_text("ab\ncd", 3, 10)
   assert_eq(wrapped.lines.length(), 2)
-  assert_eq(wrapped.lines[0], "ab")
-  assert_eq(wrapped.lines[1], "cd")
+  assert_eq(wrapped.lines[0].text, "ab")
+  assert_eq(wrapped.lines[0].start_index, 0)
+  assert_eq(wrapped.lines[1].text, "cd")
+  assert_eq(wrapped.lines[1].start_index, 3)
 }
 
 ///|
